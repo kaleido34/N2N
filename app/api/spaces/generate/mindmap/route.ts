@@ -2,22 +2,39 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { v4 as uuid } from "uuid";
 import { generateMindMap } from "@/lib/utils";
+import { verifyJwtToken } from "@/lib/jwt"; // ✅ Import verifier
 
 export async function GET(req: NextRequest) {
     try {
         const params = req.nextUrl.searchParams;
         const video_id = params.get("video_id");
         const content_id = params.get("content_id");
-        const user = await JSON.parse(req.headers.get("user") || "");
+
+        // ✅ Securely extract and verify token
+        const token = req.headers.get("authorization");
+        if (!token) {
+            return NextResponse.json(
+                { message: "Missing authorization token." },
+                { status: 401 }
+            );
+        }
+
+        const user = await verifyJwtToken(token, process.env.JWT_SECRET!);
+        if (!user || !user.user_id) {
+            return NextResponse.json(
+                { message: "Invalid or expired token." },
+                { status: 403 }
+            );
+        }
 
         if (!video_id || !content_id) {
             return NextResponse.json(
-                { message: "Please provide video_id and content_id!"},
+                { message: "Please provide video_id and content_id!" },
                 { status: 403 }
-            )
+            );
         }
 
-        // Check if content exists for this user
+        // ✅ Check if user has access to content
         const userContentExist = await prisma.userContent.findUnique({
             where: {
                 user_id_content_id: {
@@ -29,15 +46,16 @@ export async function GET(req: NextRequest) {
 
         if (!userContentExist) {
             return NextResponse.json(
-                { message: "Content not found for the user! "}, { status: 401 }
-            )
+                { message: "Content not found for the user!" },
+                { status: 401 }
+            );
         }
 
         const existingMetadata = await prisma.metadata.findUnique({
             where: {
                 youtube_id: video_id
             }
-        })
+        });
 
         if (!existingMetadata) {
             await prisma.metadata.create({
@@ -47,19 +65,17 @@ export async function GET(req: NextRequest) {
                     created_at: new Date(),
                     updated_at: new Date()
                 }
-            })
+            });
         }
 
         if (!existingMetadata?.mindmap) {
-            const youtubeData = await prisma.youtubeContent.findUnique(
-                {
-                    where: {
-                        content_id: content_id,
-                        youtube_id: video_id
-                    }
+            const youtubeData = await prisma.youtubeContent.findUnique({
+                where: {
+                    content_id: content_id,
+                    youtube_id: video_id
                 }
-            )
-            
+            });
+
             if (!youtubeData?.transcript) {
                 return NextResponse.json(
                     { message: "No transcript found for this video" },
@@ -67,16 +83,16 @@ export async function GET(req: NextRequest) {
                 );
             }
 
-            const transcripts = (youtubeData.transcript as { text: string, startTime: string, endTime: string }[]).map(chunk => chunk.text);
+            const transcripts = (youtubeData.transcript as { text: string, startTime: string, endTime: string }[])
+                .map(chunk => chunk.text);
             const fullTranscript = transcripts.join(" ");
 
             const mindMap = await generateMindMap(fullTranscript);
-
             if (!mindMap) {
                 return NextResponse.json(
-                    { message: "Could not generate mindMap!"},
+                    { message: "Could not generate mindMap!" },
                     { status: 500 }
-                )
+                );
             }
 
             const cleanedMindMap = mindMap.replace(/```json\n|```/g, '');
@@ -91,22 +107,23 @@ export async function GET(req: NextRequest) {
                 {
                     message: "mindMaps generated Successfully!",
                     data: mindMapJson
-                }, { status: 200 }
-            )
-
+                },
+                { status: 200 }
+            );
         } else {
             return NextResponse.json(
                 {
                     message: "Found mindmaps Successfully!",
                     data: existingMetadata.mindmap
-                }, { status: 200 }
-            )
+                },
+                { status: 200 }
+            );
         }
     } catch (error) {
         console.error("Error while generating mindmap: ", error instanceof Error ? error.message : error);
         return NextResponse.json(
-            { message: "Error while generating mindmap content!"},
+            { message: "Error while generating mindmap content!" },
             { status: 500 }
-        )
+        );
     }
 }
