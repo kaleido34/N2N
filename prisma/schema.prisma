@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  user_id    String   @id @default(uuid())
+  username   String   @db.VarChar(255) @unique 
+  first_name String   @db.VarChar(255) 
+  last_name  String   @db.VarChar(255)
+  password   String   @db.VarChar(255)
+  created_at DateTime @default(now())
+  spaces     Space[]
+  contents   UserContent[] 
+  chatrooms  ChatRoom[]
+  messages   Message[]
+}
+
+model Space {
+  space_id   String  @id @default(uuid())  
+  user_id    String  
+  space_name String  
+  created_at DateTime @default(now())
+  user       User    @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  contents   SpaceContent[]  // New Many-to-Many Relation
+}
+
+enum ContentType {
+  YOUTUBE_CONTENT
+  DOCUMENT_CONTENT
+}
+
+model Content {
+  content_id      String        @id @default(uuid())  // Unique ID for the content
+  content_type    ContentType   
+  created_at      DateTime      @default(now())
+  users           UserContent[]  
+  spaces          SpaceContent[]  // New Many-to-Many Relation
+  youtubeContent  YoutubeContent?  
+  documentContent DocumentContent?  
+  chatrooms       ChatRoom[]
+}
+
+model SpaceContent {
+  space_id   String
+  content_id String
+  space      Space   @relation(fields: [space_id], references: [space_id], onDelete: Cascade)
+  content    Content @relation(fields: [content_id], references: [content_id], onDelete: Cascade)
+
+  @@id([space_id, content_id]) // Composite primary key
+}
+
+model UserContent {
+  user_id    String
+  content_id String
+  user       User   @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  content    Content @relation(fields: [content_id], references: [content_id], onDelete: Cascade)
+
+  @@id([user_id, content_id]) // Composite primary key
+}
+
+model YoutubeContent {
+  content_id    String  @id @default(uuid())
+  youtube_id    String  @unique
+  title         String  @db.Text
+  description   String  @db.Text
+  thumbnail_url String  @db.Text
+  transcript    Json
+  youtube_url   String  @db.Text
+  content       Content @relation(fields: [content_id], references: [content_id], onDelete: Cascade)
+  metadata      Metadata[]
+}
+
+model DocumentContent {
+  content_id String  @id @default(uuid())
+  filename   String  @db.VarChar(255)
+  file_url   String  @db.VarChar(255)
+  doc_id     String  @unique
+  hash       String  @unique
+  content    Content @relation(fields: [content_id], references: [content_id], onDelete: Cascade)
+}
+
+model Metadata {
+  metadata_id String  @id @default(uuid())
+  youtube_id  String  @unique
+  summary     String?  
+  flashcards  Json?  
+  mindmap     Json?  
+  quiz        Json?  
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  youtubeContent YoutubeContent @relation(fields: [youtube_id], references: [youtube_id], onDelete: Cascade)
+}
+
+model ChatRoom {
+  chatroom_id String @id @default(uuid())
+  content_id  String  
+  user_id     String  
+  content     Content @relation(fields: [content_id], references: [content_id], onDelete: Cascade)
+  user        User    @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  messages    Message[]  
+  created_at  DateTime  @default(now())
+
+  @@unique([content_id, user_id]) // Unique chatroom per user-content pair
+}
+
+model Message {
+  message_id   String    @id @default(uuid())
+  chatroom_id  String    
+  user_id      String    
+  parent_id    String?   
+  chatroom     ChatRoom  @relation(fields: [chatroom_id], references: [chatroom_id], onDelete: Cascade)
+  user         User      @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  parent       Message?  @relation("MessageReplies", fields: [parent_id], references: [message_id], onDelete: Cascade) 
+  replies      Message[] @relation("MessageReplies") 
+  content      String    @db.Text 
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+}
