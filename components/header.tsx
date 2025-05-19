@@ -65,7 +65,7 @@ export function Header() {
           <div className=" flex items-center justify-center md:justify-start">
             <Link className="flex items-center space-x-1" href="/">
               <VideoSageLogo />
-              <span className="font-bold text-md md:text-2xl">VideoSage</span>
+              <span className="font-bold text-md md:text-2xl">Noise2Nectar</span>
             </Link>
           </div>
         </div>
