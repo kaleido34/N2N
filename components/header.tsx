@@ -71,11 +71,11 @@ export function Header() {
             </DropdownMenu>
           ) : (
             <>
-              <Link href="/auth/signin" className="px-6 py-2 rounded-full border border-[#23223a] text-[#232323] dark:text-white font-semibold hover:bg-[#f3f0ff] dark:hover:bg-[#23223a] hover:text-[#7B5EA7] dark:hover:text-[#C7AFFF] transition-all duration-200 flex items-center gap-2 shadow-sm text-base">
+              <Link href="/auth/signin" className="px-6 py-2 rounded-xl border border-[#23223a] text-[#232323] dark:text-white font-semibold hover:bg-[#f3f0ff] dark:hover:bg-[#23223a] hover:text-[#7B5EA7] dark:hover:text-[#C7AFFF] hover:shadow-lg transition-all duration-200 flex items-center gap-2 shadow-sm text-base">
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
                 Log In
               </Link>
-              <Link href="/auth/signup" className="px-7 py-2 rounded-full bg-gradient-to-r from-[#E5735A] to-[#E58C5A] text-white font-bold hover:from-[#d45c43] hover:to-[#e5a05a] transition-all duration-200 flex items-center gap-2 shadow-md text-base">
+              <Link href="/auth/signup" className="px-7 py-2 rounded-xl bg-gradient-to-r from-[#E5735A] to-[#E58C5A] text-white font-bold hover:from-[#d45c43] hover:to-[#e5a05a] hover:shadow-xl transition-all duration-200 flex items-center gap-2 shadow-md text-base">
                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
                 Sign Up
               </Link>

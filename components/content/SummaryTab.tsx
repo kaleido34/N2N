@@ -44,7 +44,7 @@ export default function SummaryTab({
         try {
           const response = await axios.get(`/api/spaces/generate/summary?video_id=${youtube_id}&content_id=${content_id}`, {
             headers: {
-              authorization: user?.token
+              Authorization: user?.token ? `Bearer ${user.token}` : ""
             }
           });
 

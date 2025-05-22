@@ -18,6 +18,7 @@ import { ArrowLeft } from "lucide-react";
 import { useGlobalLoading } from "@/components/LayoutClient";
 import React from "react";
 import { toast } from "sonner";
+import { BackButton } from "@/components/ui/back-button";
 
 /** Shape of each content item in the space. */
 
@@ -80,14 +81,7 @@ export default function SpacePage() {
             <h1 className="text-3xl font-bold tracking-tight" style={{color: '#5B4B8A'}}>
               {isDefault ? "Personal Workspace" : spaceData.name}
             </h1>
-            <Button
-              variant="ghost"
-              className="text-[#7B5EA7] dark:text-[#C7AFFF] hover:bg-[#7B5EA7]/10"
-              onClick={() => window.history.back()}
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
-            </Button>
+            <BackButton />
           </div>
 
           {/* Contents Grid */}

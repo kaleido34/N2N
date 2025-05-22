@@ -39,6 +39,15 @@ export function CustomThemeToggle({ className = "", onToggle }: { className?: st
 export function ThemeToggleButton({ className = "" }: { className?: string }) {
   const { theme, setTheme } = useTheme();
   const isDark = theme === "dark";
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <button

@@ -56,7 +56,7 @@ export default function MindMapTab({
         `/api/spaces/generate/mindmap?video_id=${youtube_id}&content_id=${content_id}`,
         {
           headers: {
-            authorization: user?.token
+            Authorization: user?.token ? `Bearer ${user.token}` : ""
           }
         }
       );

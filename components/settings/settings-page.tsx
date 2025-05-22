@@ -10,9 +10,10 @@ import { ProfileSettingsForm } from "./ProfileSettingsForm";
 import { DeactivateAccountDialog } from "./DeactivateAccountDialog";
 import { useAuth } from "@/hooks/auth-provider";
 import { Form } from "@/components/ui/form";
-import { Mail, CheckCircle, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { Mail, CheckCircle, Eye, EyeOff, ArrowLeft, Loader2 } from "lucide-react";
 import { FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 const profileFormSchema = z
   .object({
@@ -213,6 +214,16 @@ export function SettingsPage() {
               <h3 className="text-lg font-semibold mb-4 text-[#7B5EA7] dark:text-[#C7AFFF]">Basic Information</h3>
               <div className="grid gap-6 mb-6">
                 <ProfileSettingsForm form={form} onSubmit={onSubmit} isLoading={isLoading} />
+              </div>
+              <div className="flex justify-end mb-8">
+                <Button
+                  type="submit"
+                  disabled={isLoading}
+                  className="font-semibold bg-[#7B5EA7] dark:bg-[#C7AFFF] text-white border border-[#7B5EA7] dark:border-[#C7AFFF] hover:bg-[#684b9e] dark:hover:bg-[#B5AFFF] shadow-none rounded-lg"
+                >
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Save Changes
+                </Button>
               </div>
 
               {/* Email Verification Status */}

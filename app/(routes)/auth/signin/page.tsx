@@ -143,7 +143,7 @@ export default function SignIn() {
                 </Button>
               </div>
             </div>
-            <Button type="submit" className="w-full h-12 rounded-lg bg-[#7B5EA7] hover:bg-[#684b9e] text-white font-bold text-lg shadow transition-all duration-200">
+            <Button type="submit" className="w-full h-12 rounded-md bg-[#7B5EA7] hover:bg-[#684b9e] text-white font-bold text-lg shadow transition-all duration-200">
               Sign In
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
@@ -158,4 +158,4 @@ export default function SignIn() {
       </Card>
     </div>
   );
-} 
+}

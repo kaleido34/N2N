@@ -62,7 +62,7 @@ export default function FlashcardsTab({
         try {
           const response = await axios.get(`/api/spaces/generate/flashcard?video_id=${youtube_id}&content_id=${content_id}`, {
             headers: {
-              authorization: user?.token
+              Authorization: user?.token ? `Bearer ${user.token}` : ""
             }
           });
           

@@ -321,8 +321,65 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Footer */}
-      {/* Removed hardcoded footer as requested */}
+      {/* Footer Section */}
+      <footer className="bg-[#F9F3F3] dark:bg-[#18132A] border-t border-[#F3E9E9] dark:border-[#23223A] mt-0">
+        <div className="max-w-7xl mx-auto px-6 py-12 flex flex-col md:flex-row md:items-start md:justify-between gap-10">
+          {/* Left: Logo and description */}
+          <div className="flex-1 min-w-[220px] flex flex-col gap-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-white rounded-lg p-2 shadow border border-[#E5E5EF]">
+                <Image src="/logo.png" alt="Noise2Nectar Logo" width={40} height={40} />
+              </div>
+              <span className="font-bold text-2xl text-[#18132A] dark:text-white">Noise2Nectar</span>
+            </div>
+            <p className="text-[#444] dark:text-[#C7AFFF]/80 text-base max-w-xs">
+              Transforming learning with interactive AI-powered tools for students and educators.
+            </p>
+            <div className="flex gap-2 mt-2">
+              <a href="#" aria-label="Twitter" className="rounded-full bg-[#F3F0FF] p-2 hover:bg-[#E5E5EF] transition"><Twitter className="h-5 w-5 text-[#7B5EA7]" /></a>
+              <a href="#" aria-label="Facebook" className="rounded-full bg-[#F3F0FF] p-2 hover:bg-[#E5E5EF] transition"><Facebook className="h-5 w-5 text-[#7B5EA7]" /></a>
+              <a href="#" aria-label="Instagram" className="rounded-full bg-[#F3F0FF] p-2 hover:bg-[#E5E5EF] transition"><Instagram className="h-5 w-5 text-[#7B5EA7]" /></a>
+              <a href="#" aria-label="LinkedIn" className="rounded-full bg-[#F3F0FF] p-2 hover:bg-[#E5E5EF] transition"><svg className="h-5 w-5 text-[#7B5EA7]" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.76 0-5 2.24-5 5v14c0 2.76 2.24 5 5 5h14c2.76 0 5-2.24 5-5v-14c0-2.76-2.24-5-5-5zm-11 19h-3v-9h3v9zm-1.5-10.28c-.97 0-1.75-.79-1.75-1.75s.78-1.75 1.75-1.75 1.75.79 1.75 1.75-.78 1.75-1.75 1.75zm15.5 10.28h-3v-4.5c0-1.08-.02-2.47-1.5-2.47-1.5 0-1.73 1.17-1.73 2.39v4.58h-3v-9h2.88v1.23h.04c.4-.75 1.38-1.54 2.85-1.54 3.05 0 3.61 2.01 3.61 4.62v4.69z"/></svg></a>
+              <a href="#" aria-label="Github" className="rounded-full bg-[#F3F0FF] p-2 hover:bg-[#E5E5EF] transition"><Github className="h-5 w-5 text-[#7B5EA7]" /></a>
+            </div>
+          </div>
+          {/* Center: Navigation columns */}
+          <div className="flex-[2] grid grid-cols-2 md:grid-cols-3 gap-8">
+            <div>
+              <div className="font-semibold text-[#18132A] dark:text-white mb-3">PRODUCT</div>
+              <ul className="space-y-2">
+                <li><a href="#" className="text-[#444] dark:text-[#C7AFFF]/80 hover:underline">Features</a></li>
+                <li><a href="#" className="text-[#444] dark:text-[#C7AFFF]/80 hover:underline">Testimonials</a></li>
+                <li><a href="#" className="text-[#444] dark:text-[#C7AFFF]/80 hover:underline">FAQ</a></li>
+                <li><a href="#" className="text-[#444] dark:text-[#C7AFFF]/80 hover:underline">Blog</a></li>
+              </ul>
+            </div>
+            <div>
+              <div className="font-semibold text-[#18132A] dark:text-white mb-3">COMPANY</div>
+              <ul className="space-y-2">
+                <li><a href="#" className="text-[#444] dark:text-[#C7AFFF]/80 hover:underline">About</a></li>
+                <li><a href="#" className="text-[#444] dark:text-[#C7AFFF]/80 hover:underline">Careers</a></li>
+                <li><a href="#" className="text-[#444] dark:text-[#C7AFFF]/80 hover:underline">Press</a></li>
+                <li><a href="#" className="text-[#444] dark:text-[#C7AFFF]/80 hover:underline">Partners</a></li>
+                <li><a href="#" className="text-[#444] dark:text-[#C7AFFF]/80 hover:underline">Contact</a></li>
+              </ul>
+            </div>
+            <div>
+              <div className="font-semibold text-[#18132A] dark:text-white mb-3">LEGAL</div>
+              <ul className="space-y-2">
+                <li><a href="#" className="text-[#444] dark:text-[#C7AFFF]/80 hover:underline">Terms</a></li>
+                <li><a href="#" className="text-[#444] dark:text-[#C7AFFF]/80 hover:underline">Privacy</a></li>
+                <li><a href="#" className="text-[#444] dark:text-[#C7AFFF]/80 hover:underline">Cookies</a></li>
+                <li><a href="#" className="text-[#444] dark:text-[#C7AFFF]/80 hover:underline">Licenses</a></li>
+                <li><a href="/settings" className="text-[#444] dark:text-[#C7AFFF]/80 hover:underline">Settings</a></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div className="border-t border-[#F3E9E9] dark:border-[#23223A] py-4 px-6 flex flex-col items-center justify-center">
+          <span className="text-[#444] dark:text-[#C7AFFF]/80 text-sm text-center">© 2025 Noise2Nectar. All rights reserved.</span>
+        </div>
+      </footer>
     </div>
   );
-}   
+}

@@ -103,49 +103,43 @@ export default function ContentPage({ id }: ContentPageProps) {
       setQuizLoading(true);
       setFlashcardsLoading(true);
       setMindmapLoading(true);
-      fetch(`/api/quiz?video_id=${youtube_id}`)
-        .then(res => res.json())
-        .then(data => setQuizData(data))
-        .finally(() => setQuizLoading(false));
-      fetch(`/api/flashcards?video_id=${youtube_id}`)
-        .then(res => res.json())
-        .then(data => setFlashcardsData(data))
-        .finally(() => setFlashcardsLoading(false));
-      fetch(`/api/mindmap?video_id=${youtube_id}`)
-        .then(res => res.json())
-        .then(data => setMindmapData(data))
-        .finally(() => setMindmapLoading(false));
+      axios.get(`/api/spaces/generate/quiz?video_id=${youtube_id}&content_id=${id}`,
+        { headers: { Authorization: user?.token ? `Bearer ${user.token}` : "" } })
+        .then(res => setQuizData(res.data))
+        .catch(() => {})
+        .then(() => setQuizLoading(false));
+      axios.get(`/api/spaces/generate/flashcard?video_id=${youtube_id}&content_id=${id}`,
+        { headers: { Authorization: user?.token ? `Bearer ${user.token}` : "" } })
+        .then(res => setFlashcardsData(res.data))
+        .catch(() => {})
+        .then(() => setFlashcardsLoading(false));
+      axios.get(`/api/spaces/generate/mindmap?video_id=${youtube_id}&content_id=${id}`,
+        { headers: { Authorization: user?.token ? `Bearer ${user.token}` : "" } })
+        .then(res => setMindmapData(res.data))
+        .catch(() => {})
+        .then(() => setMindmapLoading(false));
     } else if (contentType === 'DOCUMENT_CONTENT' && documentText) {
       // Document lesson: fetch by POSTing text
       setQuizLoading(true);
       setFlashcardsLoading(true);
       setMindmapLoading(true);
-      fetch('/api/quiz', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: documentText })
-      })
-        .then(res => res.json())
-        .then(data => setQuizData(data))
-        .finally(() => setQuizLoading(false));
-      fetch('/api/flashcards', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: documentText })
-      })
-        .then(res => res.json())
-        .then(data => setFlashcardsData(data))
-        .finally(() => setFlashcardsLoading(false));
-      fetch('/api/mindmap', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: documentText })
-      })
-        .then(res => res.json())
-        .then(data => setMindmapData(data))
-        .finally(() => setMindmapLoading(false));
+      axios.post('/api/spaces/generate/quiz', { text: documentText, content_id: id },
+        { headers: { Authorization: user?.token ? `Bearer ${user.token}` : "" } })
+        .then(res => setQuizData(res.data))
+        .catch(() => {})
+        .then(() => setQuizLoading(false));
+      axios.post('/api/spaces/generate/flashcard', { text: documentText, content_id: id },
+        { headers: { Authorization: user?.token ? `Bearer ${user.token}` : "" } })
+        .then(res => setFlashcardsData(res.data))
+        .catch(() => {})
+        .then(() => setFlashcardsLoading(false));
+      axios.post('/api/spaces/generate/mindmap', { text: documentText, content_id: id },
+        { headers: { Authorization: user?.token ? `Bearer ${user.token}` : "" } })
+        .then(res => setMindmapData(res.data))
+        .catch(() => {})
+        .then(() => setMindmapLoading(false));
     }
-  }, [contentType, youtube_id, documentText]);
+  }, [contentType, youtube_id, documentText, user?.token, id]);
 
   // Fetch summary (and use correct text source)
   useEffect(() => {

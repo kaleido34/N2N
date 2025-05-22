@@ -26,18 +26,53 @@ const PanelIcon = ({ className = "w-6 h-6" }) => (
   </svg>
 );
 
-// Placeholder for recent lessons
-const recentLessons = [
-  { id: 1, title: "Photosynthesis" },
-  { id: 2, title: "Quantum Mechanics" },
-  { id: 3, title: "World War II" },
-];
-
 export default function DashboardSidebar({ minimized, setMinimized }: { minimized: boolean; setMinimized: (v: boolean) => void }) {
   const { user, logout } = useAuth();
-  const { addSpace, refreshSpaces } = useSpaces();
+  const { spaces, addSpace, refreshSpaces, setSpaces } = useSpaces();
   const router = useRouter ? useRouter() : { push: () => {} };
   const getInitials = (name: string) => name?.split(" ").map((part: string) => part[0]).join("").toUpperCase();
+
+  // Find the default/personal workspace
+  const defaultWorkspace = spaces.find(
+    (space) => space.id === "default" || space.name.toLowerCase().includes("default")
+  );
+  // Defensive: fallback to empty array if not found
+  const lessonHistory = defaultWorkspace?.contents || [];
+
+  // Local state for deleting lessons from history (optimistic update)
+  const [history, setHistory] = React.useState(lessonHistory);
+  React.useEffect(() => {
+    setHistory(lessonHistory);
+  }, [lessonHistory]);
+
+  // Delete lesson handler
+  const handleDeleteLesson = async (lessonId: string) => {
+    if (!user?.token) return;
+    try {
+      // Delete from backend
+      const res = await fetch(`/api/contents/${lessonId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      if (!res.ok) throw new Error("Failed to delete lesson");
+      // Optimistically update UI
+      setHistory((prev) => prev.filter((item) => item.id !== lessonId));
+      // Also update global store
+      if (defaultWorkspace) {
+        setSpaces(
+          spaces.map((space) =>
+            space.id === defaultWorkspace.id
+              ? { ...space, contents: (space.contents || []).filter((item) => item.id !== lessonId) }
+              : space
+          )
+        );
+      }
+      toast.success("Lesson deleted from history!");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to delete lesson");
+    }
+  };
 
   async function handleCreateSpace(name: string) {
     if (!user?.token) {
@@ -158,15 +193,27 @@ export default function DashboardSidebar({ minimized, setMinimized }: { minimize
           <div className="mt-6">
             <div className="mb-2 text-xs font-semibold text-[#E58C5A] dark:text-[#E58C5A] uppercase tracking-wide pl-6">History</div>
             <div className="flex flex-col gap-1">
-              {recentLessons.map(lesson => (
-                <div key={lesson.id} className="truncate text-xs text-[#232323] px-2 py-1 hover:bg-[#f3f0ff] dark:hover:bg-[#23223a] rounded transition cursor-pointer pl-6 flex items-center justify-between">
-                  <span>{lesson.title}</span>
+              {history.length === 0 && (
+                <div className="text-xs text-muted-foreground pl-6 py-2">No lessons yet.</div>
+              )}
+              {history.map(lesson => (
+                <div
+                  key={lesson.id}
+                  className="truncate text-xs text-[#232323] px-2 py-1 group hover:bg-[#f3f0ff] dark:hover:bg-[#23223a] rounded transition cursor-pointer pl-6 flex items-center justify-between"
+                >
+                  <span className="truncate max-w-[120px]">{lesson.title || 'Untitled'}</span>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="ml-2"><MoreVertical className="h-4 w-4" /></Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="ml-2 opacity-70 group-hover:opacity-100 hover:bg-[#E58C5A]/20 dark:hover:bg-[#E58C5A]/30 transition"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem className="text-red-500">Delete</DropdownMenuItem>
+                      <DropdownMenuItem className="text-red-500" onClick={() => handleDeleteLesson(lesson.id)}>Delete</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -194,4 +241,4 @@ export default function DashboardSidebar({ minimized, setMinimized }: { minimize
       </div>
     </aside>
   );
-} 
+}

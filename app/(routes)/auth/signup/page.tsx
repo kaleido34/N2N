@@ -152,7 +152,7 @@ export default function SignUp() {
                 </Button>
               </div>
             </div>
-            <Button type="submit" className="w-full h-12 rounded-lg bg-[#7B5EA7] hover:bg-[#684b9e] text-white font-bold text-lg shadow transition-all duration-200" disabled={loading}>
+            <Button type="submit" className="w-full h-12 rounded-md bg-[#7B5EA7] hover:bg-[#684b9e] text-white font-bold text-lg shadow transition-all duration-200" disabled={loading}>
               {loading ? "Signing Up..." : "Sign Up"}
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
@@ -167,4 +167,4 @@ export default function SignUp() {
       </Card>
     </div>
   );
-} 
+}
