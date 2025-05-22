@@ -4,8 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/auth-provider";
 import { useSpaces } from "@/hooks/space-provider";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { BackButton } from "@/components/ui/back-button";
 
 export default function DashboardPage() {
   const { isAuthenticated } = useAuth();
@@ -33,14 +32,7 @@ export default function DashboardPage() {
   return (
     <>
       <div className="fixed top-6 right-6 z-50">
-        <Button
-          variant="ghost"
-          className="text-[#7B5EA7] dark:text-[#C7AFFF] hover:bg-[#7B5EA7]/10"
-          onClick={() => router.back()}
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
-        </Button>
+        <BackButton />
       </div>
     </>
   );

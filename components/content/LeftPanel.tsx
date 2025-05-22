@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { FileText, Lightbulb, Layers, Network, Headphones } from "lucide-react";
 import Image from "next/image";
-import { CustomThemeToggle } from "@/components/mode-toggle";
+import { ThemeToggleButton } from "@/components/mode-toggle";
 
 interface LeftPanelProps {
   id: string;
@@ -86,17 +86,17 @@ export default function LeftPanel({
   }, [activeVideoTab, fetchChapters]);
 
   return (
-    <div className="w-full flex flex-col items-center gap-6 relative min-h-screen">
+    <div className="w-full flex flex-col items-center relative min-h-screen">
       {/* Website Logo and Name with Theme Toggler */}
-      <div className="flex items-center gap-4 mt-4 mb-6 w-full justify-between">
-        <div className="flex items-center gap-3 group cursor-pointer transition-transform duration-200 hover:scale-110" onClick={() => router.push('/dashboard')}> 
-          <Image src="/logo.png" alt="Logo" width={48} height={48} className="rounded-lg shadow-sm" />
-          <span className="font-extrabold text-2xl text-[#232323] dark:text-white tracking-tight">Noise2Nectar</span>
+      <div className="flex flex-col w-full mb-3">
+        <div className="flex items-center justify-between px-3 pt-0 pb-5 border-b border-sidebar-border bg-white/80 dark:bg-[#18132A]/80">
+          <div className="flex items-center gap-2 group cursor-pointer transition-transform duration-200 hover:scale-110" onClick={() => router.push('/dashboard')}> 
+            <Image src="/logo.png" alt="Logo" width={40} height={40} className="rounded-lg shadow-sm" />
+            <span className="font-extrabold text-xl text-[#232323] dark:text-white tracking-tight">Noise2Nectar</span>
+          </div>
+          <ThemeToggleButton />
         </div>
-        <CustomThemeToggle onToggle={() => router.push('/dashboard')} />
       </div>
-      {/* Divider between logo/name and thumbnail */}
-      <div className="w-full border-b border-gray-200 dark:border-gray-700 mb-4"></div>
       {/* Video Thumbnail */}
       {thumbnailUrl && (
         <div className="w-full aspect-video rounded-xl overflow-hidden bg-black flex items-center justify-center">

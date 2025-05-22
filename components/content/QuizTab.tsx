@@ -21,20 +21,23 @@ interface QuizQuestion {
 interface QuizTabProps {
   value: string;
   activeMainTab: string;
+  quizData: any;
+  quizLoading: boolean;
 }
 
 export default function QuizTab({
   value,
   activeMainTab,
+  quizData,
+  quizLoading,
 }: QuizTabProps) {
   const { id } = useParams();
   const { spaces } = useSpaces();
   const [isLoading, setIsLoading] = useState(false);
   const [youtube_id, setYoutubeId] = useState<string>("");
   const [content_id, setContentId] = useState<string>("");
-  const [quizData, setQuizData] = useState<QuizQuestion[]>([]);
-  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
   const { user } = useAuth();
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
 
   useEffect(() => {
     if (activeMainTab !== value) return; // Only proceed if this tab is active
@@ -87,19 +90,19 @@ export default function QuizTab({
       {activeMainTab === value && (
         <Card className="h-full flex flex-col min-h-0">
           <ScrollArea className="p-6 flex-1">
-            {isLoading ? (
+            {quizLoading ? (
               <div className="flex items-center justify-center h-full">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white"></div>
               </div>
             ) : (
               <div className="space-y-8">
-                {quizData.map((question, qIndex) => (
+                {quizData && quizData.questions && quizData.questions.map((question: any, qIndex: number) => (
                   <div key={qIndex} className="space-y-4">
                     <h3 className="font-medium">
                       {qIndex + 1}. {question.question}
                     </h3>
                     <div className="grid gap-2">
-                      {question.options.map((option, oIndex) => (
+                      {question.options.map((option: string, oIndex: number) => (
                         <Button
                           key={oIndex}
                           variant={

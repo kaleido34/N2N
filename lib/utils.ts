@@ -10,6 +10,30 @@ const hf = new HfInference(process.env.HF_TOKEN!)
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
+// Add model configuration
+const EMBEDDING_MODEL = 'sentence-transformers/all-MiniLM-L6-v2';
+const FALLBACK_MODEL = 'sentence-transformers/all-mpnet-base-v2';
+
+// Add helper function for model fallback
+async function getEmbedding(text: string, modelName: string): Promise<number[]> {
+    try {
+        const embedding = await hf.featureExtraction({
+            model: modelName,
+            inputs: text
+        });
+        // Ensure we're getting a flat array of numbers
+        const flatEmbedding = Array.from(embedding).flat(2) as number[];
+        return flatEmbedding;
+    } catch (error) {
+        console.error(`Error with model ${modelName}:`, error);
+        if (modelName === EMBEDDING_MODEL) {
+            console.log("Attempting fallback model...");
+            return getEmbedding(text, FALLBACK_MODEL);
+        }
+        throw error;
+    }
+}
+
 export interface transcriptInterface {
     text: string;
     duration: number;
@@ -147,18 +171,14 @@ export const generateEmbeddings = async (
     const results = [];
     for (const [i, chunk] of chunks.entries()) {
         try {
-            const embedding = await hf.featureExtraction({
-                model: 'mixedbread-ai/mxbai-embed-large-v1',
-                inputs: chunk.text
-            });
-
+            const embedding = await getEmbedding(chunk.text, EMBEDDING_MODEL);
             results.push({
                 id: `${video_id}-chunk-${i}`,
                 video_id: video_id,
                 text: chunk.text,
                 startTime: chunk.startTime,
                 endTime: chunk.endTime,
-                vector: Array.from(embedding),
+                vector: embedding,
             } as ChunkData);
         } catch (error) {
             console.error(`Error generating embedding for chunk ${i}:`, error);
@@ -373,32 +393,35 @@ export async function queryPineconeVectorStore(
     video_id: string,
     searchQuery: string
 ): Promise<string> {
-    const hfoutput = await hf.featureExtraction({
-        model: 'mixedbread-ai/mxbai-embed-large-v1',
-        inputs: searchQuery
-    })
-    
-    const queryEmbedding = Array.from(hfoutput);
-
-    const index = client.index(indexname);
-
-    const queryResponse = await index.namespace(namespace).query({
-        topK: 5,
-        vector: queryEmbedding as number[],
-        includeMetadata: true,
-        includeValues: false,
-        filter: {
-            video_id: { "$eq": video_id },
-        },
+    console.log("[HF DEBUG] About to call featureExtraction", {
+      model: EMBEDDING_MODEL,
+      token: process.env.HF_TOKEN ? 'present' : 'missing',
+      searchQuery
     });
-
-    if (queryResponse.matches.length > 0) {
-        const concatRetrievals = queryResponse.matches.map((match, idx) => {
-            return `\n Transcript chunks findings ${idx + 1}: \n ${match.metadata?.text} \n chunk timestamp startTime: ${match.metadata?.startTime} & endTime: ${match.metadata?.endTime}`
-        }).join(`\n\n`)
-
-        return concatRetrievals
-    } else {
-        return "<no match>";
+    
+    try {
+        const queryEmbedding = await getEmbedding(searchQuery, EMBEDDING_MODEL);
+        const index = client.index(indexname);
+        const queryResponse = await index.namespace(namespace).query({
+            topK: 5,
+            vector: queryEmbedding,
+            includeMetadata: true,
+            includeValues: false,
+            filter: {
+                video_id: { "$eq": video_id },
+            },
+        });
+        
+        if (queryResponse.matches.length > 0) {
+            const concatRetrievals = queryResponse.matches.map((match, idx) => {
+                return `\n Transcript chunks findings ${idx + 1}: \n ${match.metadata?.text} \n chunk timestamp startTime: ${match.metadata?.startTime} & endTime: ${match.metadata?.endTime}`
+            }).join(`\n\n`)
+            return concatRetrievals
+        } else {
+            return "<no match>";
+        }
+    } catch (error) {
+        console.error("[HF DEBUG] featureExtraction error", error);
+        return "<Error retrieving context. Proceeding with general knowledge.>";
     }
 }

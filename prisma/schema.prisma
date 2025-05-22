@@ -82,6 +82,7 @@ model DocumentContent {
   file_url   String  @db.VarChar(255)
   doc_id     String  @unique
   hash       String  @unique
+  text       String? // extracted PDF text
   content    Content @relation(fields: [content_id], references: [content_id], onDelete: Cascade)
 }
 

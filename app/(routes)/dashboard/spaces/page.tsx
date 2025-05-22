@@ -5,13 +5,14 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/auth-provider";
 import { useSpaces } from "@/hooks/space-provider";
 import { CreateSpaceDialog } from "@/components/create-space-dialog";
-import { Box, Plus, Briefcase } from "lucide-react";
+import { Box, Briefcase } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 export default function SpacesPage() {
   const { isAuthenticated, user } = useAuth();
-  const { spaces, loading, addSpace } = useSpaces();
+  const { spaces, loading, addSpace, refreshSpaces } = useSpaces();
   const router = useRouter();
 
   useEffect(() => {
@@ -20,13 +21,23 @@ export default function SpacesPage() {
     }
   }, [isAuthenticated, router]);
 
+  useEffect(() => {
+    console.log("[SpacesPage] spaces:", spaces);
+  }, [spaces]);
+
   if (!isAuthenticated || loading) {
     return <p>Loading...</p>;
   }
 
   async function handleCreateSpace(name: string) {
-    if (!user?.token) return;
+    console.log("[handleCreateSpace] called with:", name);
+    if (!user?.token) {
+      toast.error("You must be logged in to create a workspace");
+      return;
+    }
+
     try {
+      console.log("[handleCreateSpace] about to fetch");
       const res = await fetch("/api/spaces", {
         method: "POST",
         headers: {
@@ -35,16 +46,32 @@ export default function SpacesPage() {
         },
         body: JSON.stringify({ name }),
       });
-      if (!res.ok) throw new Error("Failed to create space");
+      console.log("[handleCreateSpace] fetch finished", res);
+
+      if (!res.ok) {
+        const error = await res.json();
+        console.log("[handleCreateSpace] fetch error", error);
+        throw new Error(error.message || "Failed to create space");
+      }
+
       const created = await res.json();
+      console.log("[handleCreateSpace] created:", created);
+
       addSpace({
         id: created.id,
         name: created.name,
         createdAt: created.createdAt,
         contents: [],
       });
+
+      await refreshSpaces(user.token);
+      console.log("[handleCreateSpace] after refreshSpaces");
+
+      toast.success("Workspace created successfully!");
     } catch (error) {
-      console.error(error);
+      console.error("Error creating space:", error);
+      toast.error("Failed to create workspace. Please try again.");
+      throw error;
     }
   }
 

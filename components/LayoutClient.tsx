@@ -32,9 +32,7 @@ function GlobalLoadingOverlay({ show }: { show: boolean }) {
 
 export default function LayoutClient({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  // Hide header on /signin, /signup, and any /content/[id] or /content/[id]/* route
-  const isContentPage = /^\/content(\/[^\/]+)?(\/.*)?$/.test(pathname);
-  const showHeader = pathname !== '/signin' && pathname !== '/signup' && !isContentPage;
+  const showHeader = pathname === "/";
   const [show, setShow] = useState(false);
   const prevPath = React.useRef(pathname);
 
@@ -51,8 +49,10 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
   return (
     <GlobalLoadingContext.Provider value={{ show, setShow }}>
       <GlobalLoadingOverlay show={show} />
-      {showHeader && <Header />}
-      <main className="flex-1 w-full">{children}</main>
+      <div className="flex min-h-screen flex-col">
+        {showHeader && <Header />}
+        <main className="flex-1">{children}</main>
+      </div>
     </GlobalLoadingContext.Provider>
   );
 } 

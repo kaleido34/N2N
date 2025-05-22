@@ -8,7 +8,7 @@ import { persist } from "zustand/middleware";
 // Type definitions
 export interface ContentItem {
   id: string;
-  youtube_id: string;
+  youtube_id?: string;
   type?: string;
   createdAt?: string;
   title?: string | null;
@@ -36,6 +36,7 @@ interface SpacesActions {
   createSpace: (token: string, name: string) => Promise<void>;
   addContentToSpace: (spaceId: string, content: ContentItem) => void;
   resetSpaces: () => void;
+  refreshSpaces: (token: string) => Promise<void>;
 }
 
 // Create our Zustand store
@@ -89,6 +90,25 @@ export const useSpacesStore = create(
           spaces: [],
           loading: true,
         });
+      },
+
+      // Refresh spaces list from the server
+      async refreshSpaces(token) {
+        set({ loading: true });
+        try {
+          const res = await fetch("/api/spaces", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          if (!res.ok) throw new Error("Failed to fetch spaces");
+          const { spaces } = await res.json();
+          set({ spaces, loading: false });
+        } catch (error) {
+          console.error("Error refreshing spaces:", error);
+          set({ loading: false });
+          throw error;
+        }
       },
     }),
     {

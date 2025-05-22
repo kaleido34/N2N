@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/auth-provider";
 import { useSpaces } from "@/hooks/space-provider";
 import type { SpaceItem } from "@/hooks/space-provider";
-import { Box, MoreVertical, ArrowLeft } from "lucide-react";
+import { Box, MoreVertical } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { BackButton } from "@/components/ui/back-button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,18 +16,25 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useGlobalLoading } from "@/components/LayoutClient";
+import { toast } from "sonner";
 
 export default function WorkspacesPage() {
   const { isAuthenticated, user } = useAuth();
   const { spaces, loading } = useSpaces();
   const router = useRouter();
   const { show, setShow } = useGlobalLoading();
+  const [localSpaces, setLocalSpaces] = useState(spaces);
 
   useEffect(() => {
     if (!isAuthenticated) {
       router.replace("/signin");
     }
   }, [isAuthenticated, router]);
+
+  useEffect(() => {
+    console.log("[WorkspacesPage] spaces:", spaces);
+    setLocalSpaces(spaces);
+  }, [spaces]);
 
   if (!isAuthenticated || loading) {
     return <p>Loading...</p>;
@@ -42,18 +50,19 @@ export default function WorkspacesPage() {
         },
       });
       if (!res.ok) throw new Error("Failed to delete space");
-      // Refresh the page to update the spaces list
-      router.refresh();
+      setLocalSpaces((prev) => prev.filter((s) => s.id !== spaceId));
+      toast.success("Workspace deleted successfully!");
     } catch (error) {
       console.error(error);
+      toast.error("Failed to delete workspace");
     }
   };
 
   // Find and pin the default workspace
-  const defaultWorkspace = spaces.find(
+  const defaultWorkspace = localSpaces.find(
     (space) => space.id === "default" || space.name.toLowerCase().includes("default")
   );
-  const otherWorkspaces = spaces.filter(
+  const otherWorkspaces = localSpaces.filter(
     (space) => !(space.id === "default" || space.name.toLowerCase().includes("default"))
   );
 
@@ -103,14 +112,7 @@ export default function WorkspacesPage() {
           <section className="space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold tracking-tight" style={{color: '#5B4B8A'}}>My Workspace</h2>
-              <Button
-                variant="ghost"
-                className="text-[#7B5EA7] dark:text-[#C7AFFF] hover:bg-[#7B5EA7]/10"
-                onClick={() => router.back()}
-              >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back
-              </Button>
+              <BackButton />
             </div>
             <div className="grid gap-4 grid-cols-3">
               {defaultWorkspace && renderWorkspaceCard(defaultWorkspace, true)}

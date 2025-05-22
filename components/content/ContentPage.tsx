@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import useIsMobile from "@/hooks/useIsMobile";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { useAuth } from "@/hooks/auth-provider";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 
 import {
   ResizableHandle,
@@ -16,6 +17,9 @@ import {
 
 import LeftPanel from "./LeftPanel";
 import RightPanel from "./RightPanel";
+import QuizTab from "./QuizTab";
+import FlashcardsTab from "./FlashcardsTab";
+import MindMapTab from "./MindMapTab";
 
 /**
  * (Optional) If you moved dummy data to "dummyData.ts",
@@ -52,58 +56,151 @@ export default function ContentPage({ id }: ContentPageProps) {
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [youtube_id, setYoutubeId] = useState<string>("");
   const [content_id, setContentId] = useState<string>("");
+  const [audioChunks, setAudioChunks] = useState<string[]>([]);
+  const [audioLoading, setAudioLoading] = useState(false);
+  const [audioError, setAudioError] = useState<string | null>(null);
+  const [audioUrls, setAudioUrls] = useState<string[]>([]);
+  const [currentAudioIndex, setCurrentAudioIndex] = useState(0);
+  const audioRefs = useRef<(HTMLAudioElement | null)[]>([]);
+  const [contentType, setContentType] = useState<"YOUTUBE_CONTENT" | "DOCUMENT_CONTENT" | null>(null);
+  const [documentText, setDocumentText] = useState<string>("");
+  const [quizData, setQuizData] = useState<any>(null);
+  const [quizLoading, setQuizLoading] = useState(false);
+  const [flashcardsData, setFlashcardsData] = useState<any>(null);
+  const [flashcardsLoading, setFlashcardsLoading] = useState(false);
+  const [mindmapData, setMindmapData] = useState<any>(null);
+  const [mindmapLoading, setMindmapLoading] = useState(false);
 
-  // Fetch youtube_id/content_id on mount
+  // Fetch content metadata and type
   useEffect(() => {
-    const fetchIds = async () => {
+    const fetchContent = async () => {
       try {
         const res = await fetch(`/api/contents?id=${id}`);
-        if (!res.ok) throw new Error("Failed to fetch video details");
+        if (!res.ok) throw new Error("Failed to fetch content details");
         const data = await res.json();
-        setYoutubeId(data.youtube_id);
+        setContentType(data.type);
         setContentId(id);
+        if (data.type === "YOUTUBE_CONTENT") {
+          setYoutubeId(data.youtube_id);
+        } else if (data.type === "DOCUMENT_CONTENT") {
+          setDocumentText(data.text || "");
+        }
       } catch (e) {
         setYoutubeId("");
         setContentId("");
+        setContentType(null);
+        setDocumentText("");
       }
     };
-    fetchIds();
+    fetchContent();
   }, [id]);
 
-  // Fetch summary
+  // Fetch all AI features when content is loaded
+  useEffect(() => {
+    if (!contentType) return;
+    if (contentType === 'YOUTUBE_CONTENT' && youtube_id) {
+      // Video lesson: fetch by video_id
+      setQuizLoading(true);
+      setFlashcardsLoading(true);
+      setMindmapLoading(true);
+      fetch(`/api/quiz?video_id=${youtube_id}`)
+        .then(res => res.json())
+        .then(data => setQuizData(data))
+        .finally(() => setQuizLoading(false));
+      fetch(`/api/flashcards?video_id=${youtube_id}`)
+        .then(res => res.json())
+        .then(data => setFlashcardsData(data))
+        .finally(() => setFlashcardsLoading(false));
+      fetch(`/api/mindmap?video_id=${youtube_id}`)
+        .then(res => res.json())
+        .then(data => setMindmapData(data))
+        .finally(() => setMindmapLoading(false));
+    } else if (contentType === 'DOCUMENT_CONTENT' && documentText) {
+      // Document lesson: fetch by POSTing text
+      setQuizLoading(true);
+      setFlashcardsLoading(true);
+      setMindmapLoading(true);
+      fetch('/api/quiz', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: documentText })
+      })
+        .then(res => res.json())
+        .then(data => setQuizData(data))
+        .finally(() => setQuizLoading(false));
+      fetch('/api/flashcards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: documentText })
+      })
+        .then(res => res.json())
+        .then(data => setFlashcardsData(data))
+        .finally(() => setFlashcardsLoading(false));
+      fetch('/api/mindmap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: documentText })
+      })
+        .then(res => res.json())
+        .then(data => setMindmapData(data))
+        .finally(() => setMindmapLoading(false));
+    }
+  }, [contentType, youtube_id, documentText]);
+
+  // Fetch summary (and use correct text source)
   useEffect(() => {
     const fetchSummary = async () => {
       try {
-        const response: any = await axios.get(
-          `/api/spaces/generate/summary?video_id=${youtube_id}&content_id=${content_id}`,
-          { headers: { authorization: user?.token } }
-        );
-        if (response.data && response.data.data) {
-          const summaryData = response.data.data;
-          setSummary(Array.isArray(summaryData) ? summaryData : summaryData.split('\n').filter(Boolean));
+        if (!content_id || !user?.token) return;
+        if (contentType === "DOCUMENT_CONTENT" && documentText) {
+          // Document: POST with text
+          const response: any = await axios.post(
+            `/api/spaces/generate/summary`,
+            { text: documentText, content_id },
+            { headers: { authorization: user?.token } }
+          );
+          if (response.data && response.data.data) {
+            const summaryData = response.data.data;
+            setSummary(Array.isArray(summaryData) ? summaryData : summaryData.split('\n').filter(Boolean));
+          }
+        } else if (contentType === "YOUTUBE_CONTENT" && youtube_id) {
+          // Video: GET with video_id and content_id
+          const response: any = await axios.get(
+            `/api/spaces/generate/summary?video_id=${youtube_id}&content_id=${content_id}`,
+            { headers: { authorization: user?.token } }
+          );
+          if (response.data && response.data.data) {
+            const summaryData = response.data.data;
+            setSummary(Array.isArray(summaryData) ? summaryData : summaryData.split('\n').filter(Boolean));
+          }
         }
       } catch (error) {
         setSummary(["Failed to load summary."]);
         console.error('Error fetching summary:', error);
       }
     };
-    if (youtube_id && content_id && user?.token) fetchSummary();
-  }, [youtube_id, content_id, user?.token]);
+    if ((contentType === "DOCUMENT_CONTENT" && documentText) || (contentType === "YOUTUBE_CONTENT" && youtube_id && content_id && user?.token)) {
+      fetchSummary();
+    }
+  }, [contentType, documentText, youtube_id, content_id, user?.token]);
 
   // Chat submit handler
   const handleChatSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
-
-    setChatMessages(prev => [...prev, { role: 'user', content: chatInput }]);
+    const newMessages = [...chatMessages, { role: 'user', content: chatInput }];
+    setChatMessages(newMessages);
     setChatInput('');
     setIsChatLoading(true);
-
     try {
       const response: any = await axios.post(
         `/api/spaces/generate/chat`,
-        { video_id: youtube_id, content_id: content_id, message: chatInput },
-        { headers: { authorization: user?.token } }
+        contentType === "DOCUMENT_CONTENT"
+          ? { data: { text: documentText, content_id }, messages: newMessages }
+          : { data: { video_id: youtube_id }, messages: newMessages },
+        {
+          headers: { Authorization: user?.token ? `Bearer ${user.token}` : "" },
+        }
       );
       if (response.data && response.data.data) {
         setChatMessages(prev => [...prev, { role: 'assistant', content: response.data.data }]);
@@ -121,6 +218,58 @@ export default function ContentPage({ id }: ContentPageProps) {
       ...prev,
       [questionIndex]: answerIndex,
     }));
+  };
+
+  const chunkText = (text: string, chunkSize: number = 200) => {
+    const chunks = [];
+    let i = 0;
+    while (i < text.length) {
+      chunks.push(text.slice(i, i + chunkSize));
+      i += chunkSize;
+    }
+    return chunks;
+  };
+
+  const getFirstNWordsFullSentence = (text: string, n: number = 100): string => {
+    const words = text.split(/\s+/);
+    if (words.length <= n) return text;
+    const firstN = words.slice(0, n).join(' ');
+    // Find the last sentence-ending punctuation in the first N words
+    const match = firstN.match(/([\s\S]*?[.!?])(?=[^.!?]*$)/);
+    if (match) {
+      return match[0];
+    }
+    return firstN;
+  };
+
+  const handleListenAudio = async () => {
+    setAudioLoading(true);
+    setAudioError(null);
+    setAudioUrls([]);
+    setCurrentAudioIndex(0);
+    try {
+      const text = summary.join(' ');
+      const trimmedText = getFirstNWordsFullSentence(text, 100);
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: trimmedText }),
+      });
+      if (!res.ok) throw new Error('Failed to generate audio');
+      const blob = await res.blob();
+      setAudioUrls([URL.createObjectURL(blob)]);
+    } catch (e: any) {
+      setAudioError(e.message || 'Audio generation failed');
+    } finally {
+      setAudioLoading(false);
+    }
+  };
+
+  const handleAudioEnded = () => {
+    if (currentAudioIndex < audioUrls.length - 1) {
+      setCurrentAudioIndex(currentAudioIndex + 1);
+      audioRefs.current[currentAudioIndex + 1]?.play();
+    }
   };
 
   return (
@@ -150,6 +299,27 @@ export default function ContentPage({ id }: ContentPageProps) {
           {summary.length > 0 ? summary.map((para, idx) => (
             <p key={idx} className="mb-3 text-gray-800 dark:text-gray-200 text-base leading-relaxed">{para}</p>
           )) : <span className="text-gray-400">No summary available.</span>}
+          <div className="mt-4 flex flex-col gap-2">
+            <Button onClick={handleListenAudio} disabled={audioLoading || summary.length === 0} className="w-fit">
+              {audioLoading ? 'Generating Audio...' : 'Listen Audio'}
+            </Button>
+            {audioError && <span className="text-red-500 text-sm">{audioError}</span>}
+            {audioUrls.length > 0 && (
+              <div className="flex flex-col gap-1">
+                {audioUrls.map((url, idx) => (
+                  <audio
+                    key={idx}
+                    ref={el => { audioRefs.current[idx] = el; }}
+                    src={url}
+                    controls={idx === currentAudioIndex}
+                    autoPlay={idx === currentAudioIndex}
+                    onEnded={handleAudioEnded}
+                    style={{ display: idx === currentAudioIndex ? 'block' : 'none' }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
         {/* Chat Section */}
         <div className="bg-white dark:bg-[#18132A] rounded-xl p-6 shadow mb-8 flex flex-col" style={{ maxWidth: 800 }}>
@@ -174,6 +344,30 @@ export default function ContentPage({ id }: ContentPageProps) {
             <button type="submit" className="bg-[#5B4B8A] text-white px-4 py-2 rounded-lg font-semibold" disabled={isChatLoading}>Send</button>
           </form>
         </div>
+        <Tabs defaultValue="summary" className="flex flex-col flex-1 min-h-0">
+          <TabsContent value="quiz">
+            <QuizTab
+              value="quiz"
+              activeMainTab={activeMainTab}
+              quizData={quizData}
+              quizLoading={quizLoading}
+            />
+          </TabsContent>
+          <TabsContent value="flashcards">
+            <FlashcardsTab
+              value="flashcards"
+              activeMainTab={activeMainTab}
+              flashcardsData={flashcardsData}
+              flashcardsLoading={flashcardsLoading}
+            />
+          </TabsContent>
+          <TabsContent value="mindmap">
+            <MindMapTab
+              value="mindmap"
+              activeMainTab={activeMainTab}
+            />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

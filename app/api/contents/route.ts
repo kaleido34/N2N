@@ -305,35 +305,52 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "ID is required" }, { status: 400 });
   }
 
-  try {
-    const youtubeContent = await prisma.youtubeContent.findUnique({
-      where: { content_id: id },
-      include: {
-        content: {
-          select: {
-            content_type: true,
-          },
+  // Try to find as YouTube content first
+  const youtubeContent = await prisma.youtubeContent.findUnique({
+    where: { content_id: id },
+    include: {
+      content: {
+        select: {
+          content_type: true,
         },
       },
-    });
+    },
+  });
 
-    if (!youtubeContent) {
-      return NextResponse.json({ error: "Content not found" }, { status: 404 });
-    }
-
+  if (youtubeContent) {
     return NextResponse.json({
       youtubeUrl: youtubeContent.youtube_url,
       youtube_id: youtubeContent.youtube_id,
       thumbnailUrl: youtubeContent.thumbnail_url,
       transcript: youtubeContent.transcript,
+      type: "YOUTUBE_CONTENT",
     });
-  } catch (error) {
-    console.error("Error fetching content:", error);
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
   }
+
+  // Try to find as Document content
+  const documentContent = await prisma.documentContent.findUnique({
+    where: { content_id: id },
+    include: {
+      content: {
+        select: {
+          content_type: true,
+        },
+      },
+    },
+  });
+
+  if (documentContent) {
+    return NextResponse.json({
+      filename: documentContent.filename,
+      file_url: documentContent.file_url,
+      doc_id: documentContent.doc_id,
+      hash: documentContent.hash,
+      type: "DOCUMENT_CONTENT",
+      text: documentContent.text,
+    });
+  }
+
+  return NextResponse.json({ error: "Content not found" }, { status: 404 });
 }
 
 

@@ -14,6 +14,9 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { CreateSpaceDialog } from "@/components/create-space-dialog";
+import { useSpaces } from "@/hooks/space-provider";
+import { toast } from "sonner";
+import { ThemeToggleButton } from "@/components/mode-toggle";
 
 // SVG for rectangular sidebar icon
 const PanelIcon = ({ className = "w-6 h-6" }) => (
@@ -32,17 +35,52 @@ const recentLessons = [
 
 export default function DashboardSidebar({ minimized, setMinimized }: { minimized: boolean; setMinimized: (v: boolean) => void }) {
   const { user, logout } = useAuth();
+  const { addSpace, refreshSpaces } = useSpaces();
   const router = useRouter ? useRouter() : { push: () => {} };
   const getInitials = (name: string) => name?.split(" ").map((part: string) => part[0]).join("").toUpperCase();
 
+  async function handleCreateSpace(name: string) {
+    if (!user?.token) {
+      toast.error("You must be logged in to create a workspace");
+      return;
+    }
+    try {
+      const res = await fetch("/api/spaces", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${user.token}`,
+        },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to create space");
+      }
+      const created = await res.json();
+      addSpace({
+        id: created.id,
+        name: created.name,
+        createdAt: created.createdAt,
+        contents: [],
+      });
+      await refreshSpaces(user.token);
+      toast.success("Workspace created successfully!");
+    } catch (error) {
+      console.error("Error creating space:", error);
+      toast.error("Failed to create workspace. Please try again.");
+      throw error;
+    }
+  }
+
   return (
-    <aside className={`flex flex-col h-screen bg-white/80 dark:bg-[#18132A]/80 border-r border-sidebar-border transition-all duration-300 z-50 ${minimized ? 'w-14' : 'w-64'} relative ${!minimized ? 'pl-3' : ''}`}> 
+    <aside className={`flex flex-col h-screen bg-white/80 dark:bg-[#18132A]/80 border-r border-sidebar-border transition-all duration-300 z-50 ${minimized ? 'w-16' : 'w-64'} relative ${!minimized ? 'pl-3' : ''}`}> 
       {/* Header */}
-      <div className={`flex items-center justify-between px-3 pt-3 pb-2 border-b border-sidebar-border bg-white/80 dark:bg-[#18132A]/80 ${minimized ? '' : ''}`}>
+      <div className={`flex items-center justify-between px-3 pt-5 pb-5 border-b border-sidebar-border bg-white/80 dark:bg-[#18132A]/80 ${minimized ? '' : ''}`}>
         {!minimized && (
           <Link href="/" className="flex items-center gap-2 group">
-            <Image src="/logo.png" alt="Logo" width={36} height={36} className="rounded-lg shadow-sm transition-transform duration-200 group-hover:scale-110" />
-            <span className="font-extrabold text-lg text-[#232323] dark:text-white tracking-tight transition-transform duration-200 group-hover:scale-110">Noise2Nectar</span>
+            <Image src="/logo.png" alt="Logo" width={40} height={40} className="rounded-lg shadow-sm transition-transform duration-200 group-hover:scale-110" />
+            <span className="font-extrabold text-xl text-[#232323] dark:text-white tracking-tight transition-transform duration-200 group-hover:scale-110">Noise2Nectar</span>
           </Link>
         )}
         <Button variant="ghost" size="icon" onClick={() => setMinimized(!minimized)} className={`rounded-md hover:bg-[#f3f0ff] dark:hover:bg-[#23223a] ml-auto ${minimized ? '' : ''}`}>
@@ -96,7 +134,7 @@ export default function DashboardSidebar({ minimized, setMinimized }: { minimize
         )}
         {/* Create Workspace Button */}
         {minimized ? (
-          <CreateSpaceDialog onCreateSpace={() => {}}>
+          <CreateSpaceDialog onCreateSpace={handleCreateSpace}>
             <button
               className="flex items-center justify-center h-9 w-9 mx-auto rounded-lg bg-[#FFF6ED] dark:bg-[#2A1A13] hover:bg-[#E58C5A]/20 focus:outline-none focus:ring-2 focus:ring-[#E58C5A] transition-colors"
               aria-label="Create Workspace"
@@ -106,7 +144,7 @@ export default function DashboardSidebar({ minimized, setMinimized }: { minimize
             </button>
           </CreateSpaceDialog>
         ) : (
-          <CreateSpaceDialog onCreateSpace={() => {}}>
+          <CreateSpaceDialog onCreateSpace={handleCreateSpace}>
             <Button className="w-full justify-start pl-2 pr-6 font-semibold bg-transparent hover:bg-[#E58C5A]/10 text-[#232323] dark:text-white shadow-none rounded-lg my-1 transition-colors group">
               <span className="inline-flex items-center justify-center h-9 w-9 rounded-lg bg-[#FFF6ED] dark:bg-[#2A1A13] group-hover:bg-[#E58C5A]/20 mr-3 transition-colors">
                 <Plus className="h-6 w-6 text-[#E58C5A] dark:text-[#E58C5A]" />
@@ -142,8 +180,8 @@ export default function DashboardSidebar({ minimized, setMinimized }: { minimize
       <div className="w-full flex items-center justify-between px-4 py-3 border-t border-sidebar-border bg-white/80 dark:bg-[#18132A]/80 absolute bottom-0 left-0">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Avatar className="h-9 w-9 cursor-pointer">
-              <AvatarFallback>{user?.name ? getInitials(user.name) : "U"}</AvatarFallback>
+            <Avatar className="h-9 w-9 cursor-pointer shadow-sm hover:shadow-md transition-all duration-200">
+              <AvatarFallback className="bg-[#66529C] text-white font-semibold">{user?.name ? getInitials(user.name) : "U"}</AvatarFallback>
             </Avatar>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="p-2 dark:bg-[#18132A] rounded-xl shadow-lg">
@@ -152,7 +190,7 @@ export default function DashboardSidebar({ minimized, setMinimized }: { minimize
           </DropdownMenuContent>
         </DropdownMenu>
         {/* Theme toggle only in expanded mode */}
-        {!minimized && <CustomThemeToggle />}
+        {!minimized && <ThemeToggleButton />}
       </div>
     </aside>
   );

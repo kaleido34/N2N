@@ -29,9 +29,9 @@ const Chat = () => {
 
   const { messages, input, handleInputChange, handleSubmit, isLoading } =
     useChat({
-      api: "../api/spaces/generate/chat",
+      api: "/api/spaces/generate/chat",
       headers: {
-        Authorization: `${user?.token}`,
+        Authorization: user?.token ? `Bearer ${user.token}` : "",
       },
     });
 

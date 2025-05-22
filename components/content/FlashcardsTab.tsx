@@ -9,6 +9,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { useAuth } from "@/hooks/auth-provider";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Flashcard {
   question: string;
@@ -21,11 +22,15 @@ interface Flashcard {
 interface FlashcardsTabProps {
   value: string;
   activeMainTab: string;
+  flashcardsData: any;
+  flashcardsLoading: boolean;
 }
 
 export default function FlashcardsTab({
   value,
   activeMainTab,
+  flashcardsData,
+  flashcardsLoading,
 }: FlashcardsTabProps) {
   const { id } = useParams();
   const { spaces } = useSpaces();
@@ -38,6 +43,7 @@ export default function FlashcardsTab({
   const [showAnswer, setShowAnswer] = useState(false);
   const [showExplanation, setShowExplanation] = useState(false);
   const { user } = useAuth();
+  const [flipped, setFlipped] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     setIsLoading(true);
@@ -87,114 +93,44 @@ export default function FlashcardsTab({
     setCurrentFlashcard((prev) => (prev + 1) % flashcards.length);
   };
 
+  const handleFlip = (index: number) => {
+    setFlipped(prev => ({ ...prev, [index]: !prev[index] }));
+  };
+
   return (
     <TabsContent value={value} className="flex-1 min-h-0 overflow-hidden mt-4">
       {activeMainTab === value && (
-        <Card className="h-full flex flex-col p-4 min-h-0">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white"></div>
-            </div>
-          ) : (
-            <div className="flex-1 flex flex-col space-y-4 overflow-hidden">
-              <div className="relative flex-1">
-                {flashcards.length > 0 && (
-                  <div className="relative w-full h-full">
-                    <div 
-                      className={`absolute inset-0 rounded-xl border bg-card p-6 transition-all duration-500 ${
-                        showAnswer ? "[transform:rotateY(180deg)] pointer-events-none" : ""
-                      }`}
-                      style={{
-                        transformStyle: "preserve-3d",
-                        backfaceVisibility: "hidden",
-                        WebkitBackfaceVisibility: "hidden"
-                      }}
-                      onClick={() => !showAnswer && setShowAnswer(true)}
+        <Card className="h-full flex flex-col min-h-0">
+          <ScrollArea className="p-6 flex-1">
+            {flashcardsLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white"></div>
+              </div>
+            ) : (
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {flashcardsData && flashcardsData.flashcards && flashcardsData.flashcards.map((card: any, index: number) => (
+                  <div
+                    key={index}
+                    className={`relative cursor-pointer h-40 perspective`}
+                    onClick={() => handleFlip(index)}
+                  >
+                    <div
+                      className={`transition-transform duration-500 transform ${flipped[index] ? "rotate-y-180" : ""} h-full w-full`}
                     >
-                      <div className="text-center space-y-4">
-                        <p className="text-xl font-medium">
-                          {flashcards[currentFlashcard].question}
-                        </p>
-                        
-                        <Button 
-                          variant="outline"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowHint(true);
-                          }}
-                        >
-                          Show Hint
-                        </Button>
-
-                        {showHint && (
-                          <p className="text-sm text-muted-foreground">
-                            {flashcards[currentFlashcard].hint}
-                          </p>
-                        )}
+                      <div className={`absolute w-full h-full backface-hidden flex items-center justify-center p-4 bg-white dark:bg-gray-900 rounded-lg shadow-md border border-gray-200 dark:border-gray-700`}
+                      >
+                        <span className="text-lg font-medium text-center">{card.front}</span>
                       </div>
-                    </div>
-
-                    <div 
-                      className={`absolute inset-0 rounded-xl border bg-card p-6 transition-all duration-500 [transform:rotateY(-180deg)] ${
-                        showAnswer ? "[transform:rotateY(0deg)]" : "pointer-events-none"
-                      }`}
-                      style={{
-                        transformStyle: "preserve-3d",
-                        backfaceVisibility: "hidden",
-                        WebkitBackfaceVisibility: "hidden"
-                      }}
-                    >
-                      <div className="text-center space-y-4">
-                        <p className="text-lg">
-                          {flashcards[currentFlashcard].answer}
-                        </p>
-                        
-                        <Button
-                          variant="outline"
-                          onClick={() => setShowExplanation(true)}
-                        >
-                          Show Explanation
-                        </Button>
-
-                        {showExplanation && (
-                          <div className="space-y-2">
-                            <p className="text-sm text-muted-foreground">
-                              {flashcards[currentFlashcard].explanation}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Source: {flashcards[currentFlashcard].source}
-                            </p>
-                          </div>
-                        )}
+                      <div className={`absolute w-full h-full backface-hidden flex items-center justify-center p-4 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 rotate-y-180`}
+                      >
+                        <span className="text-lg text-center">{card.back}</span>
                       </div>
                     </div>
                   </div>
-                )}
+                ))}
               </div>
-              <div className="flex items-center justify-between">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={nextCard}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-                <div className="text-sm text-muted-foreground">
-                  Card {currentFlashcard + 1} of {flashcards.length}
-                </div>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => {
-                    resetCard();
-                    setCurrentFlashcard(0);
-                  }}
-                >
-                  <RotateCcw className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
+            )}
+          </ScrollArea>
         </Card>
       )}
     </TabsContent>

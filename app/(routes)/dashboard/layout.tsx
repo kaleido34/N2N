@@ -84,10 +84,52 @@ export default function RootLayout({
   const handleFileUpload = () => {
     fileInputRef.current?.click();
   };
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      // handle your upload logic here if needed
+    if (!file) return;
+
+    // If user is on /dashboard/spaces/:spaceId
+    const matched = pathname.match(/spaces\/([^/]+)/);
+    const space_id = matched ? matched[1] : undefined;
+
+    try {
+      setIsLoading(true);
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("userId", user?.user_id || "");
+      if (space_id) formData.append("spaceId", space_id);
+
+      const res = await fetch("/api/contents/upload/pdf", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${user?.token}`,
+        },
+        body: formData,
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to upload PDF");
+      }
+
+      const { contentId, spaceId } = await res.json();
+
+      // Update local store
+      addContentToSpace(spaceId, {
+        id: contentId,
+        type: "DOCUMENT_CONTENT",
+        title: file.name,
+      });
+
+      // Always redirect to the correct space page
+      router.replace(`/dashboard/spaces/${spaceId}`);
+    } catch (err) {
+      console.error("Error uploading PDF:", err);
+    } finally {
+      setIsLoading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
   };
 

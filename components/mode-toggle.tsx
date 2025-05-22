@@ -35,3 +35,23 @@ export function CustomThemeToggle({ className = "", onToggle }: { className?: st
     </button>
   );
 }
+
+export function ThemeToggleButton({ className = "" }: { className?: string }) {
+  const { theme, setTheme } = useTheme();
+  const isDark = theme === "dark";
+
+  return (
+    <button
+      aria-label="Toggle theme"
+      onClick={() => setTheme(isDark ? "light" : "dark")}
+      className={`relative flex h-9 w-9 items-center justify-center rounded-full bg-white dark:bg-[#18132A] shadow-sm hover:bg-[#E0F2F1] dark:hover:bg-[#E0F2F1]/20 transition-all duration-200 ${className}`}
+      style={{ boxShadow: "0 2px 8px 0 rgba(229, 140, 90, 0.08)" }}
+    >
+      {isDark ? (
+        <Moon className="h-5 w-5 text-[#E58C5A]" />
+      ) : (
+        <Sun className="h-5 w-5 text-[#E58C5A]" />
+      )}
+    </button>
+  );
+}

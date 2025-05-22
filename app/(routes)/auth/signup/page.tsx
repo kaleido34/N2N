@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/card";
 import { useAuthStore } from "@/hooks/auth-provider";
 import Image from "next/image";
-import { CustomThemeToggle } from "@/components/mode-toggle";
+import { ThemeToggleButton } from "@/components/mode-toggle";
 
 export default function SignUp() {
   const router = useRouter();
@@ -48,7 +48,7 @@ export default function SignUp() {
         last_name: formData.lastName,
         password: formData.password,
       });
-      router.push("/dashboard");
+      router.push("/auth/signin");
     } catch (error) {
       // handle error (optional: show error message)
     } finally {
@@ -69,7 +69,7 @@ export default function SignUp() {
         </Link>
       </div>
       <div className="fixed top-2 right-8 z-20">
-        <CustomThemeToggle />
+        <ThemeToggleButton />
       </div>
       <Card className="w-full max-w-md rounded-2xl shadow-xl border-0 bg-white/90 dark:bg-[#18132A]/90 backdrop-blur-md">
         <CardHeader className="pb-2">
@@ -161,10 +161,10 @@ export default function SignUp() {
         <CardFooter className="flex justify-center">
           <p className="text-base text-gray-600 dark:text-gray-300">
             Already have an account?{' '}
-            <Link href="/signin" className="text-[#E5735A] dark:text-[#F8B4A0] font-semibold hover:underline">Sign In</Link>
+            <Link href="/auth/signin" className="text-[#E5735A] dark:text-[#F8B4A0] font-semibold hover:underline">Sign In</Link>
           </p>
         </CardFooter>
       </Card>
     </div>
   );
-}
+} 

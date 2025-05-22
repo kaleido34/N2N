@@ -17,14 +17,17 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useGlobalLoading } from "@/components/LayoutClient";
 import React from "react";
+import { toast } from "sonner";
 
 /** Shape of each content item in the space. */
 
 export default function SpacePage() {
   const { id } = useParams();
   const { spaces, loading } = useSpaces();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { setShow } = useGlobalLoading();
+
+  const [localContents, setLocalContents] = React.useState(spaces.find((space) => space.id === id)?.contents || []);
 
   React.useEffect(() => {
     if (!isAuthenticated || loading) {
@@ -32,9 +35,10 @@ export default function SpacePage() {
     } else {
       setShow(false);
     }
+    setLocalContents(spaces.find((space) => space.id === id)?.contents || []);
     // Hide overlay on unmount
     return () => setShow(false);
-  }, [isAuthenticated, loading, setShow]);
+  }, [isAuthenticated, loading, setShow, spaces]);
 
   // Show loading state if not authenticated or still loading spaces
   if (!isAuthenticated || loading) {
@@ -51,12 +55,19 @@ export default function SpacePage() {
   const isDefault = spaceData.id === "default" || spaceData.name.toLowerCase().includes("default");
 
   const handleDeleteContent = async (contentId: string) => {
-    // TODO: Replace with your actual API endpoint for deleting content
     try {
-      await fetch(`/api/contents/${contentId}`, { method: "DELETE" });
-      window.location.reload(); // Or use router.refresh() if available
+      const res = await fetch(`/api/contents/${contentId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${user?.token}`,
+        },
+      });
+      if (!res.ok) throw new Error("Failed to delete lesson");
+      setLocalContents((prev) => prev.filter((item) => item.id !== contentId));
+      toast.success("Lesson deleted successfully!");
     } catch (error) {
       console.error(error);
+      toast.error("Failed to delete lesson");
     }
   };
 
@@ -81,7 +92,7 @@ export default function SpacePage() {
 
           {/* Contents Grid */}
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {spaceData.contents?.map((item) => (
+            {localContents.map((item) => (
               <div key={item.id} className="relative group">
                 <Link
                   href={`/content/${item.id}`}

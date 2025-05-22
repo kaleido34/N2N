@@ -2,15 +2,15 @@ import "./globals.css";
 import { Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/hooks/auth-provider";
-import { Header } from "@/components/header";
 import { SpacesProvider } from "@/hooks/space-provider";
+import LayoutClient from "@/components/LayoutClient";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
-  title: "VideoSage - AI-Powered Video Learning",
+  title: "Noise2Nectar - AI-Powered Learning",
   description:
-    "Transform your YouTube learning experience with AI-powered tools for better understanding and interaction.",
+    "Transform your learning experience with AI-powered tools for better understanding and interaction.",
 };
 
 export default function RootLayout({
@@ -29,20 +29,7 @@ export default function RootLayout({
         >
           <AuthProvider>
             <SpacesProvider>
-              <div className="flex h-screen overflow-hidden">
-                <div className="flex flex-col flex-1 overflow-hidden dark:bg-gray-900">
-                  <Header />
-                  <main className="flex-1 overflow-y-auto dark:bg-gray-900">
-                    {children}
-                  </main>
-                  <footer className=" mx-auto w-full px-4 py-2 text-center text-gray-600 dark:bg-gray-900 border-t dark:text-gray-400 ">
-                    <p>
-                      &copy; {new Date().getFullYear()} VideoSage. All rights
-                      reserved.
-                    </p>
-                  </footer>
-                </div>
-              </div>
+              <LayoutClient>{children}</LayoutClient>
             </SpacesProvider>
           </AuthProvider>
         </ThemeProvider>

@@ -47,16 +47,18 @@ export async function GET(req: NextRequest) {
         id: spaceContent.content.content_id,
         type: spaceContent.content.content_type,
         createdAt: spaceContent.content.created_at,
-        // If it’s a YouTube content:
+        // If it's a YouTube content:
         title: spaceContent.content.youtubeContent?.title || null,
         thumbnailUrl:
           spaceContent.content.youtubeContent?.thumbnail_url || null,
-        // If it’s a Document content:
+        // If it's a Document content:
         filename: spaceContent.content.documentContent?.filename || null,
         fileUrl: spaceContent.content.documentContent?.file_url || null,
         youtube_id: spaceContent.content.youtubeContent?.youtube_id || null,
       })),
     }));
+
+    console.log("[API /api/spaces] Returning spaces:", spaces);
 
     return NextResponse.json({ spaces }, { status: 200 });
   } catch (error) {
