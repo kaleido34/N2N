@@ -85,3 +85,56 @@ export async function GET(
     );
   }
 }
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const authHeader = req.headers.get("Authorization") || "";
+    const token = authHeader.split(" ")[1];
+    if (!token) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
+    // Verify token
+    const payload = await verifyJwtToken(token, process.env.JWT_SECRET!);
+    const userId = payload?.user_id;
+    if (!userId) {
+      return NextResponse.json(
+        { message: "Invalid token: missing user_id" },
+        { status: 401 }
+      );
+    }
+
+    // Check if space exists and belongs to user
+    const space = await prisma.space.findFirst({
+      where: {
+        space_id: params.id,
+        user_id: userId,
+      },
+    });
+
+    if (!space) {
+      return NextResponse.json(
+        { message: "Space not found or unauthorized" },
+        { status: 404 }
+      );
+    }
+
+    // Delete the space
+    await prisma.space.delete({
+      where: {
+        space_id: params.id,
+      },
+    });
+
+    return NextResponse.json({ message: "Space deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting space:", error);
+    return NextResponse.json(
+      { message: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}

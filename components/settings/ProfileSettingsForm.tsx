@@ -37,10 +37,6 @@ export function ProfileSettingsForm({
 }: ProfileSettingsFormProps) {
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-2xl mb-4">Profile Settings</CardTitle>
-      </CardHeader>
-
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <CardContent className="space-y-6">

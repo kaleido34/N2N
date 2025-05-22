@@ -45,6 +45,32 @@ const Chat = () => {
               but your feedback will help me improve!
             </p>
           </div>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              handleSubmit(event, {
+                data: {
+                  video_id: youtube_id,
+                },
+              });
+            }}
+            className="flex space-x-2"
+          >
+            <div className="flex-1">
+              <Input
+                placeholder="Ask anything..."
+                value={input}
+                onChange={handleInputChange}
+              />
+            </div>
+            <Button type="submit" size="icon" disabled={isLoading}>
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </form>
           {messages.map((message, index) => {
             return (
               <MessageBox
@@ -65,34 +91,6 @@ const Chat = () => {
           )}
         </div>
       </ScrollArea>
-      <div className="p-4 border-t">
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            handleSubmit(event, {
-              data: {
-                video_id: youtube_id,
-              },
-            });
-          }}
-          className="flex space-x-2"
-        >
-          <div className="flex-1">
-            <Input
-              placeholder="Ask anything..."
-              value={input}
-              onChange={handleInputChange}
-            />
-          </div>
-          <Button type="submit" size="icon" disabled={isLoading}>
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </Button>
-        </form>
-      </div>
     </Card>
   );
 };

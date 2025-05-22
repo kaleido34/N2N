@@ -4,7 +4,7 @@ import * as React from "react";
 import { useTheme } from "next-themes";
 import { Moon, Sun } from "lucide-react";
 
-export function CustomThemeToggle() {
+export function CustomThemeToggle({ className = "", onToggle }: { className?: string, onToggle?: () => void }) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
 
@@ -16,28 +16,22 @@ export function CustomThemeToggle() {
     return null;
   }
 
+  const handleClick = () => {
+    setTheme(theme === "dark" ? "light" : "dark");
+    if (onToggle) onToggle();
+  };
+
   return (
     <button
-      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-      className="relative inline-flex border h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900 focus-visible:ring-blue-500"
-      role="switch"
-      aria-checked={theme === "dark"}
+      onClick={handleClick}
+      className={`flex items-center justify-center h-10 w-10 rounded-full border border-[#e5e5ef] bg-white/80 dark:bg-[#23223a]/80 shadow-md transition-colors duration-300 focus:outline-none hover:bg-[#f3f0ff] dark:hover:bg-[#23223a] ${className}`}
+      aria-label="Toggle dark mode"
     >
-      <span className="sr-only">Toggle dark mode</span>
-      <span
-        className={`${
-          theme === "dark"
-            ? "translate-x-6 bg-gray-800"
-            : "translate-x-1 bg-white"
-        } inline-block h-4 w-4 transform rounded-full transition-transform duration-200 ease-in-out`}
-      />
-      <Sun className="absolute left-1 z-50 top-1/2 h-3 w-3 -translate-y-1/2 transform text-yellow-500 transition-opacity duration-200 ease-in-out dark:opacity-0" />
-      <Moon className="absolute right-1 z-50 top-1/2 h-3 w-3 -translate-y-1/2 transform text-blue-500 transition-opacity duration-200 ease-in-out opacity-0 dark:opacity-100" />
-      <span
-        className={`${
-          theme === "dark" ? "bg-gray-900" : "bg-gray-200"
-        } absolute inset-0 rounded-full transition-colors duration-200 ease-in-out`}
-      />
+      {theme === "dark" ? (
+        <Moon className="h-6 w-6 text-[#7B5EA7] transition-all duration-300" />
+      ) : (
+        <Sun className="h-6 w-6 text-[#E5735A] transition-all duration-300" />
+      )}
     </button>
   );
 }

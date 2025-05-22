@@ -2,11 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { ArrowRight, Mail, User, Lock, Eye, EyeOff } from "lucide-react";
 import axios from "axios";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +17,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useAuthStore } from "@/hooks/auth-provider";
+import Image from "next/image";
+import { CustomThemeToggle } from "@/components/mode-toggle";
 
 export default function SignUp() {
   const router = useRouter();
@@ -29,23 +29,18 @@ export default function SignUp() {
     lastName: "",
     password: "",
   });
-  const pathname = usePathname();
   const { isAuthenticated } = useAuthStore();
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
-      if (pathname === "/signup") {
-        router.replace("/dashboard");
-      }
-    } else if (!isAuthenticated) {
-      if (pathname !== "/signup") {
-        router.replace("/signin");
-      }
+      router.replace("/dashboard");
     }
-  }, [isAuthenticated, pathname, router]);
+  }, [isAuthenticated, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     try {
       await axios.post("/api/users/signup", {
         username: formData.username,
@@ -53,10 +48,11 @@ export default function SignUp() {
         last_name: formData.lastName,
         password: formData.password,
       });
-
       router.push("/dashboard");
     } catch (error) {
-      console.error("Signup failed:", error);
+      // handle error (optional: show error message)
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -65,129 +61,110 @@ export default function SignUp() {
   };
 
   return (
-    <div className="min-h-full bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
-      <div className="flex-col md:flex-row flex w-full max-w-6xl gap-8 h-[80vh]">
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5 }}
-          className="flex-1 rounded-2xl bg-black dark:bg-white text-white dark:text-black p-8 flex flex-col justify-center h-full"
-        >
-          <blockquote className="text-2xl font-serif italic mb-4">
-            &ldquo;Education is not the filling of a pail, but the lighting of a
-            fire.&rdquo;
-          </blockquote>
-          <p className="text-lg">- W.B. Yeats</p>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5 }}
-          className="flex-1 flex justify-center items-center"
-        >
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle className="text-2xl font-bold">
-                Sign Up for VideoSage
-              </CardTitle>
-              <CardDescription>
-                Create your account to get started
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-                    <Input
-                      id="username"
-                      name="username"
-                      type="username"
-                      placeholder="you@example.com"
-                      required
-                      value={formData.username}
-                      onChange={handleChange}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-                    <Input
-                      id="firstName"
-                      name="firstName"
-                      type="text"
-                      required
-                      value={formData.firstName}
-                      onChange={handleChange}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-                    <Input
-                      id="lastName"
-                      name="lastName"
-                      type="text"
-                      required
-                      value={formData.lastName}
-                      onChange={handleChange}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-                    <Input
-                      id="password"
-                      name="password"
-                      type={showPassword ? "text" : "password"}
-                      required
-                      minLength={8}
-                      value={formData.password}
-                      onChange={handleChange}
-                      className="pl-10 pr-10"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4 text-gray-500" />
-                      ) : (
-                        <Eye className="h-4 w-4 text-gray-500" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-                <Button type="submit" className="w-full">
-                  Sign Up
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </form>
-            </CardContent>
-            <CardFooter className="flex justify-center">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Already have an account?{" "}
-                <Link href="/signin" className="text-blue-600 hover:underline">
-                  Sign In
-                </Link>
-              </p>
-            </CardFooter>
-          </Card>
-        </motion.div>
+    <div className="h-screen w-full bg-gradient-to-br from-[#7B5EA7] via-[#6C4F8F] to-[#E5735A] flex flex-col items-center justify-center relative pt-16">
+      <div className="absolute top-0 left-0 w-full flex items-center justify-between px-8 py-4 z-10 bg-white/80 dark:bg-[#23223a]/80">
+        <Link href="/" className="flex items-center gap-3 group">
+          <Image src="/logo.png" alt="Noise2Nectar Logo" width={36} height={36} className="rounded-lg shadow-sm transition-all duration-300 group-hover:scale-105" />
+          <span className="font-extrabold text-2xl text-[#232323] dark:text-white tracking-tight transition-transform duration-200 group-hover:scale-110">Noise2Nectar</span>
+        </Link>
       </div>
+      <div className="fixed top-2 right-8 z-20">
+        <CustomThemeToggle />
+      </div>
+      <Card className="w-full max-w-md rounded-2xl shadow-xl border-0 bg-white/90 dark:bg-[#18132A]/90 backdrop-blur-md">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-3xl font-extrabold text-center text-[#232323] dark:text-white">Sign Up</CardTitle>
+          <CardDescription className="text-center text-gray-500 dark:text-gray-300 text-base">Create your account to get started</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-[#232323] dark:text-[#C7AFFF]">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 dark:text-[#C7AFFF]" />
+                <Input
+                  id="username"
+                  name="username"
+                  type="username"
+                  placeholder="you@example.com"
+                  required
+                  value={formData.username}
+                  onChange={handleChange}
+                  className="pl-10 h-12 rounded-lg border border-gray-200 dark:border-[#2A2540] focus:border-[#7B5EA7] focus:ring-2 focus:ring-[#7B5EA7] bg-white dark:bg-[#23223A] text-[#232323] dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#C7AFFF]"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="firstName" className="text-[#232323] dark:text-[#C7AFFF]">First Name</Label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 dark:text-[#C7AFFF]" />
+                <Input
+                  id="firstName"
+                  name="firstName"
+                  type="text"
+                  required
+                  value={formData.firstName}
+                  onChange={handleChange}
+                  className="pl-10 h-12 rounded-lg border border-gray-200 dark:border-[#2A2540] focus:border-[#7B5EA7] focus:ring-2 focus:ring-[#7B5EA7] bg-white dark:bg-[#23223A] text-[#232323] dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#C7AFFF]"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lastName" className="text-[#232323] dark:text-[#C7AFFF]">Last Name</Label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 dark:text-[#C7AFFF]" />
+                <Input
+                  id="lastName"
+                  name="lastName"
+                  type="text"
+                  required
+                  value={formData.lastName}
+                  onChange={handleChange}
+                  className="pl-10 h-12 rounded-lg border border-gray-200 dark:border-[#2A2540] focus:border-[#7B5EA7] focus:ring-2 focus:ring-[#7B5EA7] bg-white dark:bg-[#23223A] text-[#232323] dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#C7AFFF]"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-[#232323] dark:text-[#C7AFFF]">Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 dark:text-[#C7AFFF]" />
+                <Input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  minLength={8}
+                  value={formData.password}
+                  onChange={handleChange}
+                  className="pl-10 pr-10 h-12 rounded-lg border border-gray-200 dark:border-[#2A2540] focus:border-[#7B5EA7] focus:ring-2 focus:ring-[#7B5EA7] bg-white dark:bg-[#23223A] text-[#232323] dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#C7AFFF]"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5 text-gray-400 dark:text-[#C7AFFF]" />
+                  ) : (
+                    <Eye className="h-5 w-5 text-gray-400 dark:text-[#C7AFFF]" />
+                  )}
+                </Button>
+              </div>
+            </div>
+            <Button type="submit" className="w-full h-12 rounded-lg bg-[#7B5EA7] hover:bg-[#684b9e] text-white font-bold text-lg shadow transition-all duration-200" disabled={loading}>
+              {loading ? "Signing Up..." : "Sign Up"}
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+          </form>
+        </CardContent>
+        <CardFooter className="flex justify-center">
+          <p className="text-base text-gray-600 dark:text-gray-300">
+            Already have an account?{' '}
+            <Link href="/signin" className="text-[#E5735A] dark:text-[#F8B4A0] font-semibold hover:underline">Sign In</Link>
+          </p>
+        </CardFooter>
+      </Card>
     </div>
   );
 }

@@ -59,7 +59,12 @@ export default {
   				'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
   				border: 'hsl(var(--sidebar-border))',
   				ring: 'hsl(var(--sidebar-ring))'
-  			}
+  			},
+  			dark1: '#11001C',
+  			dark2: '#290025',
+  			dark3: '#35012C',
+  			dark4: '#4F0147',
+  			dark5: '#3A015C',
   		},
   		borderRadius: {
   			lg: 'var(--radius)',

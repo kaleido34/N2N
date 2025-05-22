@@ -1,12 +1,19 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/auth-provider";
 import { useSpaces } from "@/hooks/space-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Link2, ArrowRight, Loader2 } from "lucide-react";
+import { Link2, ArrowRight, Loader2, Paperclip, FileText, Image as ImageIcon, Video, Music, ArrowRightCircle } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
+import DashboardSidebar from "@/components/DashboardSidebar";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 
 export default function RootLayout({
   children,
@@ -19,11 +26,13 @@ export default function RootLayout({
   const [isLoading, setIsLoading] = useState(false);
   const { isAuthenticated, user } = useAuth();
   const { setSpaces, setLoading, loading, addContentToSpace } = useSpaces();
+  const [minimized, setMinimized] = useState(false);
+  const [mediaDropdownOpen, setMediaDropdownOpen] = useState(false);
 
   const router = useRouter();
 
   // -------------------------------
-  // 1) If not authenticated, redirect; otherwise fetch user’s spaces once
+  // 1) If not authenticated, redirect; otherwise fetch user's spaces once
   // -------------------------------
   useEffect(() => {
     if (!isAuthenticated) {
@@ -50,7 +59,23 @@ export default function RootLayout({
   }, [isAuthenticated, user?.token, router, setSpaces, setLoading]);
 
   if (!isAuthenticated || loading) {
-    return <p>Loading...</p>;
+    // Use branded loading overlay
+    return (
+      <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white/80 dark:bg-[#18132A]/80 transition-colors duration-300">
+        <div className="flex flex-col items-center gap-6">
+          <div className="animate-bounce">
+            <img src="/logo.png" alt="Noise2Nectar Logo" width={80} height={80} className="rounded-2xl shadow-xl" />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-2xl font-extrabold text-[#7B5EA7] dark:text-[#C7AFFF] tracking-tight">Noise2Nectar</span>
+            <span className="sr-only">Loading...</span>
+          </div>
+          <div className="mt-4">
+            <span className="inline-block h-6 w-6 rounded-full border-4 border-[#7B5EA7] border-t-transparent animate-spin dark:border-[#C7AFFF] dark:border-t-transparent"></span>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // -------------------------------
@@ -122,59 +147,79 @@ export default function RootLayout({
   // 4) Render
   // -------------------------------
   return (
-    <div className="p-8 md:p-16 dark:bg-gray-900">
-      <div className="flex h-full overflow-hidden">
-        <div className="flex flex-col flex-1 overflow-hidden">
-          <section className="flex flex-col items-center space-y-4">
-            <h1 className="text-3xl font-bold tracking-tighter text-center sm:text-4xl md:text-5xl my-4">
-              What do you want to learn today?
-            </h1>
-
-            <div className="w-full max-w-3xl">
-              <form onSubmit={handleSubmit}>
-                <div className="relative">
-                  {/* Left icon: file upload */}
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center space-x-2">
-                    <button
-                      type="button"
-                      onClick={handleFileUpload}
-                      disabled={isLoading}
-                      className="p-2 hover:bg-muted rounded-full transition-colors"
-                    >
-                      {isLoading ? <Loader2 className="h-5 w-5 animate-spin"/> : <Link2 className="h-5 w-5 text-muted-foreground" />}
-                    </button>
-                  </div>
-
+    <div className="flex min-h-screen w-full overflow-x-hidden dark:bg-gray-900">
+      {/* Sidebar */}
+      <DashboardSidebar minimized={minimized} setMinimized={setMinimized} />
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col transition-all duration-300">
+        {/* What are you learning today section - only on main dashboard */}
+        {pathname === '/dashboard' && (
+          <section className="flex flex-1 flex-col items-center justify-center min-h-screen w-full bg-transparent">
+            <div className="flex flex-col items-center justify-center w-full">
+              <h1 className="text-6xl font-extrabold text-center mb-10" style={{color: '#5B4B8A', lineHeight: 1.1}}>What are you learning today?</h1>
+              <form onSubmit={handleSubmit} className="w-full flex justify-center">
+                <div className="relative w-full max-w-xl bg-white dark:bg-[#18132A] border border-gray-300 dark:border-gray-700 rounded-2xl flex flex-col shadow-none mx-auto">
                   <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileChange}
-                    className="hidden"
-                    accept="video/*,application/pdf,.doc,.docx"
-                  />
-
-                  <Input
+                    type="text"
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
-                    placeholder="Upload file, paste YouTube video, or record a lecture"
-                    className="pl-12 pr-12 h-14 border-2 text-xs md:text-sm dark:bg-gray-900"
+                    placeholder="Paste a URL to get started..."
+                    className="w-full px-6 py-5 text-base bg-transparent border-none outline-none rounded-2xl placeholder:text-gray-400 dark:placeholder:text-[#C7AFFF] text-[#232323] dark:text-white"
                   />
-
-                  {/* Right icon: submit */}
+                  <div className="flex items-center gap-2 px-4 pb-4 pt-0">
+                    <Button 
+                      type="button"
+                      variant="ghost"
+                      className="flex items-center gap-2 px-3 py-2 text-base font-medium hover:bg-[#7B5EA7]/10"
+                      style={{color: '#5B4B8A'}}
+                      onClick={handleFileUpload}
+                    >
+                      <FileText className="h-5 w-5" /> Add PDF
+                    </Button>
+                    <DropdownMenu open={mediaDropdownOpen} onOpenChange={setMediaDropdownOpen}>
+                      <DropdownMenuTrigger asChild>
+                        <Button 
+                          type="button"
+                          variant="ghost"
+                          className="flex items-center gap-2 px-3 py-2 text-base font-medium hover:bg-[#7B5EA7]/10"
+                          style={{color: '#5B4B8A'}}
+                        >
+                          <Paperclip className="h-5 w-5" /> Add Media
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-40">
+                        <DropdownMenuItem className="flex items-center gap-2 cursor-pointer" onClick={() => { fileInputRef.current?.setAttribute('accept', 'image/*'); fileInputRef.current?.click(); }}>
+                          <ImageIcon className="h-4 w-4" /> Image
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="flex items-center gap-2 cursor-pointer" onClick={() => { fileInputRef.current?.setAttribute('accept', 'audio/*'); fileInputRef.current?.click(); }}>
+                          <Music className="h-4 w-4" /> Audio
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="flex items-center gap-2 cursor-pointer" onClick={() => { fileInputRef.current?.setAttribute('accept', 'video/*'); fileInputRef.current?.click(); }}>
+                          <Video className="h-4 w-4" /> Video
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                   <Button
                     type="submit"
-                    size="icon"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg"
+                    className="absolute right-4 bottom-4 h-10 w-10 rounded-xl bg-[#7B5EA7] dark:bg-[#C7AFFF] text-white dark:text-[#18132A] flex items-center justify-center shadow-md border-none p-0"
+                    disabled={isLoading || !inputValue.trim()}
                   >
-                    <ArrowRight className="h-5 w-5" />
+                    {isLoading ? <Loader2 className="animate-spin h-5 w-5" /> : <ArrowRight className="h-6 w-6" />}
                   </Button>
                 </div>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  className="hidden"
+                  accept="application/pdf,image/*,audio/*,video/*"
+                />
               </form>
             </div>
           </section>
-
-          <div className="flex-1 overflow-y-auto mt-8">{children}</div>
-        </div>
+        )}
+        <div className="flex-1 overflow-y-auto p-6">{children}</div>
       </div>
     </div>
   );

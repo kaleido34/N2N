@@ -37,6 +37,17 @@ interface PineconeVector {
     };
 }
 
+interface MindMapNode {
+  key: number;
+  text: string;
+  category?: string;
+}
+
+interface MindMapData {
+  nodes: MindMapNode[];
+  links: { from: number; to: number }[];
+}
+
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
@@ -306,13 +317,53 @@ export const generateQuiz = async (transcripts: string) => {
 };
 
 export const generateMindMap = async (transcripts: string) => {
-  const prompt = `You are an AI designed to generate hierarchical mind maps from YouTube transcripts. Your output should be in a JSON format that is compatible with GoJS. Generate mindmap content such that it covers entire video mapped. 
-                  1. The JSON should have two main arrays: nodes and links.
-                  2. Each node should have a key (unique identifier), text (label), and optionally a category (to group types of nodes).
-                  3. Each link should connect two nodes using their key values (from and to).
-                  4. Organize the nodes hierarchically, starting with the root idea, followed by main topics and subtopics. Use numbers or unique IDs for the key field to maintain structure.`;
-  const generateContent = await model.generateContent([prompt, transcripts]);
-  return generateContent.response.text(); 
+  // Split transcript into chunks of approximately 1000 words
+  const words = transcripts.split(' ');
+  const chunks = [];
+  for (let i = 0; i < words.length; i += 1000) {
+    chunks.push(words.slice(i, i + 1000).join(' '));
+  }
+
+  const prompt = `You are an AI designed to generate hierarchical mind maps from YouTube transcripts. Create a concise, well-structured mind map that captures the main topics and key points.
+
+  Requirements:
+  1. Focus on main topics and their direct subtopics (max 2 levels deep)
+  2. Keep node text concise (max 5-7 words per node)
+  3. Use clear, hierarchical relationships
+  4. Output in GoJS-compatible JSON format with nodes and links arrays
+  5. Limit total nodes to 15-20 for better performance
+
+  JSON Structure:
+  {
+    "nodes": [
+      {"key": 1, "text": "Main Topic", "category": "root"},
+      {"key": 2, "text": "Subtopic 1", "category": "section"},
+      ...
+    ],
+    "links": [
+      {"from": 1, "to": 2},
+      ...
+    ]
+  }`;
+
+  // Process chunks sequentially
+  let mindMapData: MindMapData | null = null;
+  for (const chunk of chunks) {
+    const generateContent = await model.generateContent([prompt, chunk]);
+    const chunkData: MindMapData = JSON.parse(generateContent.response.text());
+    
+    if (!mindMapData) {
+      mindMapData = chunkData;
+    } else {
+      // Merge new nodes and links, avoiding duplicates
+      const existingKeys = new Set(mindMapData.nodes.map((n: MindMapNode) => n.key));
+      const newNodes = chunkData.nodes.filter((n: MindMapNode) => !existingKeys.has(n.key));
+      mindMapData.nodes.push(...newNodes);
+      mindMapData.links.push(...chunkData.links);
+    }
+  }
+
+  return JSON.stringify(mindMapData);
 };
 
 export async function queryPineconeVectorStore(

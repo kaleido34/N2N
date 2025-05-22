@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { CustomThemeToggle } from "@/components/mode-toggle";
 import { useAuth } from "@/hooks/auth-provider";
-import { ChevronLeft, Menu, Settings, LogOut } from "lucide-react";
+import { Menu, Settings, LogOut, LogIn, UserPlus } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,11 +16,14 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from "@/components/sidebar";
 import Image from "next/image";
-import { DialogTitle } from "@radix-ui/react-dialog";
+import { Card } from "@/components/ui/card";
+import React, { useState } from "react";
 
 export function Header() {
   const { user, logout } = useAuth();
   const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
 
   const getInitials = (name: string) => {
     return name
@@ -30,87 +33,57 @@ export function Header() {
       .toUpperCase();
   };
 
+  // Remove header entirely on dashboard pages
+  if (pathname.startsWith("/dashboard")) {
+    return null;
+  }
+
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-white dark:bg-gray-900 backdrop-blur">
-      <div className=" flex h-14 items-center my-3 px-2 md:px-12 justify-between w-full">
-        <div className="flex items-center">
-          <div className=" flex items-center ">
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="mr-2">
-                  <Menu className="h-5 w-5" />
-                  <span className="sr-only">Toggle Menu</span>
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="p-0">
-                {/* Add DialogTitle here */}
-                <DialogTitle className="sr-only">
-                  Sidebar Navigation
-                </DialogTitle>
-                <Sidebar />
-              </SheetContent>
-            </Sheet>
-          </div>
-          <div className="md:flex items-center w-6 h-6 hidden ">
-            <Button
-              className=" h-8 w-8"
-              variant="ghost"
-              size="icon"
-              onClick={() => router.back()}
-            >
-              <ChevronLeft className="h-3 w-3" />
-              <span className="sr-only">Go back</span>
-            </Button>
-          </div>
-          <div className=" flex items-center justify-center md:justify-start">
-            <Link className="flex items-center space-x-1" href="/">
-              <VideoSageLogo />
-              <span className="font-bold text-md md:text-2xl">Noise2Nectar</span>
-            </Link>
-          </div>
-        </div>
-        <div className="flex justify-center items-center space-x-4">
-          <nav className="md:flex items-center space-x-4 justify-end hidden">
-            {user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Avatar className="h-10 w-10 cursor-pointer">
-                    <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
-                  </Avatar>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="p-6 dark:bg-gray-900" align="end">
-                  <DropdownMenuItem onSelect={() => router.push("/settings")}>
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Settings</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => logout()}>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <>
-                <Button className="border" variant="ghost" asChild>
-                  <Link href="/signin">Sign In</Link>
-                </Button>
-                <Button
-                  className="bg-gray-900 border text-white"
-                  variant="ghost"
-                  asChild
-                >
-                  <Link href="/signup">Sign Up</Link>
-                </Button>
-              </>
+    <header className="sticky top-0 z-50 w-full border-b border-[#e5e5ef] bg-white/80 dark:bg-[#18132A]/80 backdrop-blur-md shadow-sm transition-colors duration-300">
+      <div className="flex h-16 items-center px-4 md:px-10 justify-between w-full">
+        <div className="flex items-center gap-6">
+          <Link className="flex items-center space-x-3" href="/">
+            <Image src="/logo.png" alt="Noise2Nectar Logo" width={36} height={36} className="rounded-lg shadow-sm" />
+            <span className="font-extrabold text-2xl text-[#232323] dark:text-white tracking-tight">Noise2Nectar</span>
+          </Link>
+          <nav className="hidden md:flex items-center space-x-2 ml-6">
+            <Link href="#features" className="px-3 py-2 rounded-lg text-[#232323] dark:text-white font-medium hover:bg-[#f3f0ff] dark:hover:bg-[#23223a] hover:text-[#7B5EA7] dark:hover:text-[#C7AFFF] transition-colors">Features</Link>
+            <Link href="#how-it-works" className="px-3 py-2 rounded-lg text-[#232323] dark:text-white font-medium hover:bg-[#f3f0ff] dark:hover:bg-[#23223a] hover:text-[#7B5EA7] dark:hover:text-[#C7AFFF] transition-colors">How It Works</Link>
+            <Link href="#testimonials" className="px-3 py-2 rounded-lg text-[#232323] dark:text-white font-medium hover:bg-[#f3f0ff] dark:hover:bg-[#23223a] hover:text-[#7B5EA7] dark:hover:text-[#C7AFFF] transition-colors">Testimonials</Link>
+            <Link href="#pricing" className="px-3 py-2 rounded-lg text-[#232323] dark:text-white font-medium hover:bg-[#f3f0ff] dark:hover:bg-[#23223a] hover:text-[#7B5EA7] dark:hover:text-[#C7AFFF] transition-colors">Pricing</Link>
+            {user && (
+              <Link href="/dashboard" className="px-3 py-2 rounded-lg text-[#232323] dark:text-white font-medium hover:bg-[#f3f0ff] dark:hover:bg-[#23223a] hover:text-[#7B5EA7] dark:hover:text-[#C7AFFF] transition-colors">Dashboard</Link>
             )}
           </nav>
-          <CustomThemeToggle />
+        </div>
+        <div className="flex items-center space-x-3">
+          <CustomThemeToggle className="relative top-[-4px]" />
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Avatar className="h-10 w-10 cursor-pointer">
+                  <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+                </Avatar>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="p-6 dark:bg-[#18132A] rounded-xl shadow-lg" align="end">
+                <DropdownMenuItem onSelect={() => router.push("/settings")}> <Settings className="mr-2 h-4 w-4" /> <span>Settings</span> </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => logout()}> <LogOut className="mr-2 h-4 w-4" /> <span>Log out</span> </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <>
+              <Link href="/signin" className="px-6 py-2 rounded-full border border-[#23223a] text-[#232323] dark:text-white font-semibold hover:bg-[#f3f0ff] dark:hover:bg-[#23223a] hover:text-[#7B5EA7] dark:hover:text-[#C7AFFF] transition-all duration-200 flex items-center gap-2 shadow-sm text-base">
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+                Log In
+              </Link>
+              <Link href="/signup" className="px-7 py-2 rounded-full bg-gradient-to-r from-[#E5735A] to-[#E58C5A] text-white font-bold hover:from-[#d45c43] hover:to-[#e5a05a] transition-all duration-200 flex items-center gap-2 shadow-md text-base">
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                Sign Up
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </header>
   );
-}
-
-function VideoSageLogo() {
-  return <Image src={"/logo.png"} alt="Logo" width="55" height="55"></Image>;
 }

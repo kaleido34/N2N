@@ -13,22 +13,22 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus } from "lucide-react";
+import { Briefcase } from "lucide-react";
 
 interface CreateSpaceDialogProps {
   onCreateSpace: (name: string) => void;
   children?: React.ReactNode; // Allow children to be passed
 }
 
-export function CreateSpaceDialog({ onCreateSpace }: CreateSpaceDialogProps) {
+export function CreateSpaceDialog({ onCreateSpace, children }: CreateSpaceDialogProps) {
   const [open, setOpen] = React.useState(false);
-  const [spaceName, setSpaceName] = React.useState("");
+  const [workspaceName, setWorkspaceName] = React.useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (spaceName.trim()) {
-      onCreateSpace(spaceName);
-      setSpaceName("");
+    if (workspaceName.trim()) {
+      onCreateSpace(workspaceName);
+      setWorkspaceName("");
       setOpen(false);
     }
   };
@@ -36,34 +36,36 @@ export function CreateSpaceDialog({ onCreateSpace }: CreateSpaceDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="dark:bg-gray-900 border" variant="outline">
-          <Plus className="mr-2 h-4 w-4" />
-          New Space
-        </Button>
+        {children || (
+          <Button className="font-semibold bg-gradient-to-r from-[#E58C5A] to-[#7B5EA7] hover:from-[#e5a05a] hover:to-[#684b9e] text-white shadow-none rounded-lg">
+            <Briefcase className="h-5 w-5 mr-2" />
+            Create Workspace
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Create new space</DialogTitle>
+          <DialogTitle style={{color: '#5B4B8A'}}>Create new workspace</DialogTitle>
           <DialogDescription>
-            Create a new space to organize your content. You can add videos,
+            Create a new workspace to organize your content. You can add videos,
             documents, and more.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="name">Space name</Label>
+              <Label htmlFor="name">Workspace name</Label>
               <Input
                 id="name"
-                value={spaceName}
-                onChange={(e) => setSpaceName(e.target.value)}
-                placeholder="Enter space name"
+                value={workspaceName}
+                onChange={(e) => setWorkspaceName(e.target.value)}
+                placeholder="Enter workspace name"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit" disabled={!spaceName.trim()}>
-              Create space
+            <Button type="submit" disabled={!workspaceName.trim()}>
+              Create
             </Button>
           </DialogFooter>
         </form>

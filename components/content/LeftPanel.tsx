@@ -8,6 +8,11 @@ import {
   ResizableHandle,
 } from "@/components/ui/resizable";
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { FileText, Lightbulb, Layers, Network, Headphones } from "lucide-react";
+import Image from "next/image";
+import { CustomThemeToggle } from "@/components/mode-toggle";
 
 interface LeftPanelProps {
   id: string;
@@ -27,8 +32,9 @@ export default function LeftPanel({
 }: LeftPanelProps) {
   // const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [transcript, setTranscript] = useState<TranscriptSegment[]>([]);
-  // const [currentThumbnail, setCurrentThumbnail] = useState(thumbnailUrl);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [youtube_id, setYoutube_id] = useState("");
+  const router = useRouter();
 
   // Transcript parser function
   const parseTranscript = (
@@ -45,9 +51,9 @@ export default function LeftPanel({
       const res = await fetch(`/api/contents?id=${id}`);
       if (!res.ok) throw new Error("Failed to fetch video details");
       const data = await res.json();
+      console.log('API /api/contents?id=' + id + ' response:', data); // Debug log
       setYoutube_id(data.youtube_id);
-      // setCurrentThumbnail(data.thumbnailUrl);
-
+      setThumbnailUrl(data.thumbnailUrl || null);
       // Parse and set the transcript
       const parsedTranscript = parseTranscript(data.transcript);
       setTranscript(parsedTranscript);
@@ -80,71 +86,76 @@ export default function LeftPanel({
   }, [activeVideoTab, fetchChapters]);
 
   return (
-    <div className="w-full h-full p-4 flex flex-col space-y-4 min-h-0">
-      <ResizablePanelGroup
-        direction="vertical"
-        className="w-full h-full rounded-lg border flex-1 min-h-0"
+    <div className="w-full flex flex-col items-center gap-6 relative min-h-screen">
+      {/* Website Logo and Name with Theme Toggler */}
+      <div className="flex items-center gap-4 mt-4 mb-6 w-full justify-between">
+        <div className="flex items-center gap-3 group cursor-pointer transition-transform duration-200 hover:scale-110" onClick={() => router.push('/dashboard')}> 
+          <Image src="/logo.png" alt="Logo" width={48} height={48} className="rounded-lg shadow-sm" />
+          <span className="font-extrabold text-2xl text-[#232323] dark:text-white tracking-tight">Noise2Nectar</span>
+        </div>
+        <CustomThemeToggle onToggle={() => router.push('/dashboard')} />
+      </div>
+      {/* Divider between logo/name and thumbnail */}
+      <div className="w-full border-b border-gray-200 dark:border-gray-700 mb-4"></div>
+      {/* Video Thumbnail */}
+      {thumbnailUrl && (
+        <div className="w-full aspect-video rounded-xl overflow-hidden bg-black flex items-center justify-center">
+          <img
+            src={thumbnailUrl}
+            alt="Video Thumbnail"
+            className="object-cover w-full h-full"
+            style={{ maxHeight: '100%', maxWidth: '100%' }}
+          />
+        </div>
+      )}
+      {/* View Transcript Button */}
+      <Button
+        variant="outline"
+        className="w-full flex items-center gap-2 justify-center text-[#5B4B8A] border-[#5B4B8A] font-semibold text-base"
+        onClick={() => router.push(`/content/${id}/transcript`)}
       >
-        {/* Video Panel */}
-        <ResizablePanel
-          defaultSize={18}
-          minSize={10}
-          maxSize={50}
-          className="min-h-0 h-fit w-auto"
+        <FileText className="h-5 w-5" /> View Transcript
+      </Button>
+      {/* Interact and Learn Section */}
+      <div className="w-full bg-[#F8F6FF] dark:bg-[#23223a] rounded-xl p-4 flex flex-col gap-3">
+        <div className="font-bold text-[#5B4B8A] text-base mb-2">Interact and Learn</div>
+        <Button
+          variant="outline"
+          className="w-full flex items-center gap-2 justify-center text-[#E58C5A] border-[#E58C5A] font-semibold text-base"
+          onClick={() => router.push(`/content/${id}/quiz`)}
         >
-          <div className="aspect-video rounded-lg overflow-hidden bg-black h-fit w-auto">
-            {/* Render YouTube iframe if video is playing */}
-            <iframe
-              width="100%"
-              height="100%"
-              src={`https://www.youtube.com/embed/${youtube_id}`}
-              title="Video Player"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              className="w-full h-full"
-            ></iframe>
-          </div>
-        </ResizablePanel>
-
-        <ResizableHandle className="hidden md:flex my-2" />
-
-        {/* Chapters/Transcript Panel (hidden on mobile) */}
-        <ResizablePanel
-          defaultSize={30}
-          minSize={10}
-          maxSize={70}
-          className="hidden md:flex flex-col min-h-0 flex-1"
+          <Lightbulb className="h-5 w-5" /> Take a Quiz
+        </Button>
+        <Button
+          variant="outline"
+          className="w-full flex items-center gap-2 justify-center text-[#7B5EA7] border-[#7B5EA7] font-semibold text-base"
+          onClick={() => router.push(`/content/${id}/flashcards`)}
         >
-          <Tabs
-            value={activeVideoTab}
-            onValueChange={setActiveVideoTab}
-            className="w-full h-full flex flex-col"
-          >
-            <TabsList className="grid w-full grid-cols-1">
-              <TabsTrigger value="transcript" className="w-full">Transcript</TabsTrigger>
-            </TabsList>
-
-            <TabsContent
-              value="transcript"
-              className="flex-1 min-h-0 overflow-hidden"
-            >
-              <ScrollArea className="h-full">
-                {transcript.map((segment, index) => (
-                  <div
-                    key={index}
-                    className="flex space-x-4 p-4 hover:bg-muted/50 rounded-lg cursor-pointer"
-                  >
-                    <span className="text-sm text-muted-foreground whitespace-nowrap">
-                      {segment.time}
-                    </span>
-                    <p className="text-sm">{segment.text}</p>
-                  </div>
-                ))}
-              </ScrollArea>
-            </TabsContent>
-          </Tabs>
-        </ResizablePanel>
-      </ResizablePanelGroup>
+          <Layers className="h-5 w-5" /> View Flashcards
+        </Button>
+        <Button
+          variant="outline"
+          className="w-full flex items-center gap-2 justify-center text-[#5B4B8A] border-[#5B4B8A] font-semibold text-base"
+          onClick={() => router.push(`/content/${id}/mindmap`)}
+        >
+          <Network className="h-5 w-5" /> Create Mindmap
+        </Button>
+        <Button
+          variant="outline"
+          className="w-full flex items-center gap-2 justify-center text-[#E58C5A] border-[#E58C5A] font-semibold text-base"
+          onClick={() => router.push(`/content/${id}/games`)}
+        >
+          <Lightbulb className="h-5 w-5" /> Play Games
+        </Button>
+      </div>
+      {/* Listen Audio Button (separate) */}
+      <Button
+        variant="outline"
+        className="w-full flex items-center gap-2 justify-center text-[#E58C5A] border-[#E58C5A] font-semibold text-base"
+        onClick={() => router.push(`/content/${id}/audio`)}
+      >
+        <Headphones className="h-5 w-5" /> Listen Audio
+      </Button>
     </div>
   );
 }
