@@ -5,8 +5,9 @@ import prisma from "@/lib/prisma";
 
 export async function POST(req: NextRequest) {
   try {
-    const token = req.headers.get("authorization");
+    let token = req.headers.get("authorization");
     if (!token) return NextResponse.json({ message: "Missing authorization token." }, { status: 401 });
+    if (token.startsWith("Bearer ")) token = token.slice(7);
     const user = await verifyJwtToken(token, process.env.JWT_SECRET!);
     if (!user || !user.user_id) return NextResponse.json({ message: "Invalid or expired token." }, { status: 403 });
 
@@ -31,4 +32,4 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     return NextResponse.json({ message: "Error while generating flashcards!" }, { status: 500 });
   }
-} 
+}

@@ -33,7 +33,7 @@ export default function SummaryTab({
     for (const space of spaces) {
       const content = space.contents?.find(content => content.id === id);
       if (content) {
-        setYoutubeId(content.youtube_id);
+        setYoutubeId(content.youtube_id || "");
         setContentId(content.id);
         break;
       }
@@ -44,7 +44,7 @@ export default function SummaryTab({
         try {
           const response = await axios.get(`/api/spaces/generate/summary?video_id=${youtube_id}&content_id=${content_id}`, {
             headers: {
-              Authorization: user?.token ? `Bearer ${user.token}` : ""
+              authorization: user?.token
             }
           });
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchTranscripts, preprocessTranscript, generateEmbeddings, initializePinecone, upsertChunksToPinecone } from "@/lib/utils";
+import { fetchTranscripts, preprocessTranscript, initializePinecone, upsertChunksToPinecone } from "@/lib/utils";
+import { generateEmbeddings } from "@/lib/embedding-utils";
 
 export async function POST(req: NextRequest) {
   try {

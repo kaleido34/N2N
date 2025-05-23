@@ -32,55 +32,12 @@ export default function FlashcardsTab({
   flashcardsData,
   flashcardsLoading,
 }: FlashcardsTabProps) {
-  const { id } = useParams();
-  const { spaces } = useSpaces();
-  const [isLoading, setIsLoading] = useState(false);
-  const [youtube_id, setYoutubeId] = useState<string>("");
-  const [content_id, setContentId] = useState<string>("");
-  const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
+  // Remove all fetching logic and local flashcards state
   const [currentFlashcard, setCurrentFlashcard] = useState(0);
   const [showHint, setShowHint] = useState(false);
   const [showAnswer, setShowAnswer] = useState(false);
   const [showExplanation, setShowExplanation] = useState(false);
-  const { user } = useAuth();
   const [flipped, setFlipped] = useState<Record<number, boolean>>({});
-
-  useEffect(() => {
-    setIsLoading(true);
-    // Find the content across all spaces
-    for (const space of spaces) {
-      const content = space.contents?.find(content => content.id === id);
-      if (content) {
-        setYoutubeId(content.youtube_id);
-        setContentId(content.id);
-        break;
-      }
-    }
-
-    if (youtube_id && content_id) {
-      async function fetchData() {
-        try {
-          const response = await axios.get(`/api/spaces/generate/flashcard?video_id=${youtube_id}&content_id=${content_id}`, {
-            headers: {
-              Authorization: user?.token ? `Bearer ${user.token}` : ""
-            }
-          });
-          
-          // @ts-expect-error Response type is not properly defined
-          if (response?.data?.data?.flashcards) {
-            // @ts-expect-error Response type is not properly defined
-            setFlashcards(response.data.data.flashcards);
-          }
-        } catch (error) {
-          console.log("error while getting flashcards: ", error);
-        } finally {
-          setIsLoading(false);
-        }
-      }
-
-      fetchData();
-    }
-  }, [spaces, id, youtube_id, content_id, user?.token]);
 
   const resetCard = () => {
     setShowHint(false);
@@ -90,7 +47,7 @@ export default function FlashcardsTab({
 
   const nextCard = () => {
     resetCard();
-    setCurrentFlashcard((prev) => (prev + 1) % flashcards.length);
+    setCurrentFlashcard((prev) => (prev + 1) % (flashcardsData?.flashcards?.length || 1));
   };
 
   const handleFlip = (index: number) => {

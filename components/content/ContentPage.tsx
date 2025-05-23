@@ -20,6 +20,7 @@ import RightPanel from "./RightPanel";
 import QuizTab from "./QuizTab";
 import FlashcardsTab from "./FlashcardsTab";
 import MindMapTab from "./MindMapTab";
+import { useLessonCache } from '@/hooks/useLessonCache';
 
 /**
  * (Optional) If you moved dummy data to "dummyData.ts",
@@ -42,15 +43,14 @@ export default function ContentPage({ id }: ContentPageProps) {
   const isMobile = useIsMobile();
   const router = useRouter();
   const { user } = useAuth();
+  const { getLessonData, setLessonData } = useLessonCache();
 
   const [activeMainTab, setActiveMainTab] = useState("chat");
   const [activeVideoTab, setActiveVideoTab] = useState("transcript");
   const [chatInput, setChatInput] = useState("");
   const [currentFlashcard, setCurrentFlashcard] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
-  const [selectedAnswers, setSelectedAnswers] = useState<
-    Record<number, number>
-  >({});
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
   const [summary, setSummary] = useState<string[]>([]);
   const [chatMessages, setChatMessages] = useState<{ role: string; content: string }[]>([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -71,7 +71,21 @@ export default function ContentPage({ id }: ContentPageProps) {
   const [mindmapData, setMindmapData] = useState<any>(null);
   const [mindmapLoading, setMindmapLoading] = useState(false);
 
-  // Fetch content metadata and type
+  // On mount, try to load from cache
+  useEffect(() => {
+    const cached = getLessonData(id);
+    if (cached) {
+      setQuizData(cached.quizData ?? null);
+      setFlashcardsData(cached.flashcardsData ?? null);
+      setMindmapData(cached.mindmapData ?? null);
+      setSummary(Array.isArray(cached.summary) ? cached.summary : []);
+      setQuizLoading(false);
+      setFlashcardsLoading(false);
+      setMindmapLoading(false);
+    }
+  }, [id, getLessonData]);
+
+  // Fetch content metadata and type ONCE per lesson
   useEffect(() => {
     const fetchContent = async () => {
       try {
@@ -95,88 +109,133 @@ export default function ContentPage({ id }: ContentPageProps) {
     fetchContent();
   }, [id]);
 
-  // Fetch all AI features when content is loaded
+  // Fetch all AI features ONCE per lesson, only if not cached
   useEffect(() => {
+    const cached = getLessonData(id);
+    if (cached && cached.quizData && cached.flashcardsData && cached.mindmapData && cached.summary?.length > 0) {
+      // Already loaded from cache
+      return;
+    }
     if (!contentType) return;
     if (contentType === 'YOUTUBE_CONTENT' && youtube_id) {
-      // Video lesson: fetch by video_id
       setQuizLoading(true);
       setFlashcardsLoading(true);
       setMindmapLoading(true);
-      axios.get(`/api/spaces/generate/quiz?video_id=${youtube_id}&content_id=${id}`,
-        { headers: { Authorization: user?.token ? `Bearer ${user.token}` : "" } })
-        .then(res => setQuizData(res.data))
-        .catch(() => {})
-        .then(() => setQuizLoading(false));
-      axios.get(`/api/spaces/generate/flashcard?video_id=${youtube_id}&content_id=${id}`,
-        { headers: { Authorization: user?.token ? `Bearer ${user.token}` : "" } })
-        .then(res => setFlashcardsData(res.data))
-        .catch(() => {})
-        .then(() => setFlashcardsLoading(false));
-      axios.get(`/api/spaces/generate/mindmap?video_id=${youtube_id}&content_id=${id}`,
-        { headers: { Authorization: user?.token ? `Bearer ${user.token}` : "" } })
-        .then(res => setMindmapData(res.data))
-        .catch(() => {})
-        .then(() => setMindmapLoading(false));
+      // Quiz
+      fetch(`/api/spaces/generate/quiz?video_id=${youtube_id}&content_id=${content_id}`, {
+        headers: { Authorization: user?.token ? `Bearer ${user.token}` : "" }
+      })
+        .then(res => res.json())
+        .then(data => {
+          setQuizData(data.data);
+          setLessonData(id, { quizData: data.data });
+        })
+        .finally(() => setQuizLoading(false));
+      // Flashcards
+      fetch(`/api/spaces/generate/flashcard?video_id=${youtube_id}&content_id=${content_id}`, {
+        headers: { Authorization: user?.token ? `Bearer ${user.token}` : "" }
+      })
+        .then(res => res.json())
+        .then(data => {
+          setFlashcardsData(data.data);
+          setLessonData(id, { flashcardsData: data.data });
+        })
+        .finally(() => setFlashcardsLoading(false));
+      // Mindmap
+      fetch(`/api/spaces/generate/mindmap?video_id=${youtube_id}&content_id=${content_id}`, {
+        headers: { Authorization: user?.token ? `Bearer ${user.token}` : "" }
+      })
+        .then(res => res.json())
+        .then(data => {
+          setMindmapData(data.data);
+          setLessonData(id, { mindmapData: data.data });
+        })
+        .finally(() => setMindmapLoading(false));
+      // Summary
+      fetch(`/api/spaces/generate/summary?video_id=${youtube_id}&content_id=${content_id}`, {
+        headers: { Authorization: user?.token ? `Bearer ${user.token}` : "" }
+      })
+        .then(res => res.json())
+        .then(data => {
+          const summaryData = data.data;
+          let summaryArr: string[] = [];
+          if (Array.isArray(summaryData)) {
+            summaryArr = summaryData;
+          } else if (typeof summaryData === 'string') {
+            summaryArr = summaryData.split('\n').filter(Boolean);
+          }
+          setSummary(summaryArr);
+          setLessonData(id, { summary: summaryArr });
+        });
     } else if (contentType === 'DOCUMENT_CONTENT' && documentText) {
-      // Document lesson: fetch by POSTing text
       setQuizLoading(true);
       setFlashcardsLoading(true);
       setMindmapLoading(true);
-      axios.post('/api/spaces/generate/quiz', { text: documentText, content_id: id },
-        { headers: { Authorization: user?.token ? `Bearer ${user.token}` : "" } })
-        .then(res => setQuizData(res.data))
-        .catch(() => {})
-        .then(() => setQuizLoading(false));
-      axios.post('/api/spaces/generate/flashcard', { text: documentText, content_id: id },
-        { headers: { Authorization: user?.token ? `Bearer ${user.token}` : "" } })
-        .then(res => setFlashcardsData(res.data))
-        .catch(() => {})
-        .then(() => setFlashcardsLoading(false));
-      axios.post('/api/spaces/generate/mindmap', { text: documentText, content_id: id },
-        { headers: { Authorization: user?.token ? `Bearer ${user.token}` : "" } })
-        .then(res => setMindmapData(res.data))
-        .catch(() => {})
-        .then(() => setMindmapLoading(false));
+      // Quiz
+      fetch('/api/spaces/generate/quiz', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: user?.token ? `Bearer ${user.token}` : "" },
+        body: JSON.stringify({ text: documentText, content_id })
+      })
+        .then(res => res.json())
+        .then(data => {
+          setQuizData(data.data);
+          setLessonData(id, { quizData: data.data });
+        })
+        .finally(() => setQuizLoading(false));
+      // Flashcards
+      fetch('/api/spaces/generate/flashcard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: user?.token ? `Bearer ${user.token}` : "" },
+        body: JSON.stringify({ text: documentText, content_id })
+      })
+        .then(res => res.json())
+        .then(data => {
+          setFlashcardsData(data.data);
+          setLessonData(id, { flashcardsData: data.data });
+        })
+        .finally(() => setFlashcardsLoading(false));
+      // Mindmap
+      fetch('/api/spaces/generate/mindmap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: user?.token ? `Bearer ${user.token}` : "" },
+        body: JSON.stringify({ text: documentText, content_id })
+      })
+        .then(res => res.json())
+        .then(data => {
+          setMindmapData(data.data);
+          setLessonData(id, { mindmapData: data.data });
+        })
+        .finally(() => setMindmapLoading(false));
+      // Summary
+      fetch('/api/spaces/generate/summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: user?.token ? `Bearer ${user.token}` : "" },
+        body: JSON.stringify({ text: documentText, content_id })
+      })
+        .then(res => res.json())
+        .then(data => {
+          const summaryData = data.data;
+          let summaryArr: string[] = [];
+          if (Array.isArray(summaryData)) {
+            summaryArr = summaryData;
+          } else if (typeof summaryData === 'string') {
+            summaryArr = summaryData.split('\n').filter(Boolean);
+          }
+          setSummary(summaryArr);
+          setLessonData(id, { summary: summaryArr });
+        });
     }
-  }, [contentType, youtube_id, documentText, user?.token, id]);
+  }, [contentType, youtube_id, documentText, content_id, user?.token, id, getLessonData, setLessonData]);
 
-  // Fetch summary (and use correct text source)
+  // Debug: Log the token before making API calls
   useEffect(() => {
-    const fetchSummary = async () => {
-      try {
-        if (!content_id || !user?.token) return;
-        if (contentType === "DOCUMENT_CONTENT" && documentText) {
-          // Document: POST with text
-          const response: any = await axios.post(
-            `/api/spaces/generate/summary`,
-            { text: documentText, content_id },
-            { headers: { authorization: user?.token } }
-          );
-          if (response.data && response.data.data) {
-            const summaryData = response.data.data;
-            setSummary(Array.isArray(summaryData) ? summaryData : summaryData.split('\n').filter(Boolean));
-          }
-        } else if (contentType === "YOUTUBE_CONTENT" && youtube_id) {
-          // Video: GET with video_id and content_id
-          const response: any = await axios.get(
-            `/api/spaces/generate/summary?video_id=${youtube_id}&content_id=${content_id}`,
-            { headers: { authorization: user?.token } }
-          );
-          if (response.data && response.data.data) {
-            const summaryData = response.data.data;
-            setSummary(Array.isArray(summaryData) ? summaryData : summaryData.split('\n').filter(Boolean));
-          }
-        }
-      } catch (error) {
-        setSummary(["Failed to load summary."]);
-        console.error('Error fetching summary:', error);
-      }
-    };
-    if ((contentType === "DOCUMENT_CONTENT" && documentText) || (contentType === "YOUTUBE_CONTENT" && youtube_id && content_id && user?.token)) {
-      fetchSummary();
+    if (!user?.token) {
+      console.warn('No user token found!');
+    } else {
+      console.log('User token being sent:', user.token);
     }
-  }, [contentType, documentText, youtube_id, content_id, user?.token]);
+  }, [user?.token]);
 
   // Chat submit handler
   const handleChatSubmit = async (e: React.FormEvent) => {
@@ -359,6 +418,8 @@ export default function ContentPage({ id }: ContentPageProps) {
             <MindMapTab
               value="mindmap"
               activeMainTab={activeMainTab}
+              mindmapData={mindmapData}
+              mindmapLoading={mindmapLoading}
             />
           </TabsContent>
         </Tabs>

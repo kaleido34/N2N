@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { fetchTranscripts, preprocessTranscript, generateEmbeddings, initializePinecone, upsertChunksToPinecone } from "@/lib/utils";
+import { fetchTranscripts, preprocessTranscript, initializePinecone, upsertChunksToPinecone } from "@/lib/utils";
+import { generateEmbeddings } from "@/lib/embedding-utils";
 
 export async function POST() {
   try {

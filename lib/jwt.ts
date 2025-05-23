@@ -18,7 +18,6 @@ export async function verifyJwtToken(
     );
     return payload as MyJWTPayload;
   } catch (error) {
-    console.error("Failed to verify JWT:", error);
     return null; // Return null if the token is invalid
   }
 }

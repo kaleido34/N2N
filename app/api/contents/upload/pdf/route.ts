@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.js";
+import * as pdfjsLib from "pdfjs-dist";
 import prisma from "@/lib/prisma";
 import { v4 as uuid } from "uuid";
 
@@ -110,4 +110,4 @@ export async function POST(req: NextRequest) {
   // For now, you can use the documentContent table or add a new field if needed
 
   return new Response(JSON.stringify({ contentId, spaceId: finalSpaceId }), { status: 200 });
-} 
+}

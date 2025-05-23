@@ -30,12 +30,26 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
-
+# env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 # vercel
 .vercel
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Python local servers and virtual environments
+/python-servers/__pycache__/
+/python-servers/.env
+/python-servers/.venv/
+/python-servers/venv/
+
+# If you want to keep your venv for Python in python-servers (recommended):
+# Ignore any venv in the root as well
+/.venv/
+/venv/

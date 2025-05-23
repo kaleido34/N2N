@@ -6,17 +6,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { useSpaces } from "@/hooks/space-provider";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
-import axios from "axios";
+import { useState } from "react";
 import { useAuth } from "@/hooks/auth-provider";
-
-interface QuizQuestion {
-  question: string;
-  options: string[];
-  correct_option: string;
-  explanation: string;
-  timestamp: string;
-}
 
 interface QuizTabProps {
   value: string;
@@ -33,50 +24,8 @@ export default function QuizTab({
 }: QuizTabProps) {
   const { id } = useParams();
   const { spaces } = useSpaces();
-  const [isLoading, setIsLoading] = useState(false);
-  const [youtube_id, setYoutubeId] = useState<string>("");
-  const [content_id, setContentId] = useState<string>("");
   const { user } = useAuth();
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
-
-  useEffect(() => {
-    if (activeMainTab !== value) return; // Only proceed if this tab is active
-    
-    setIsLoading(true);
-    // Find the content across all spaces
-    for (const space of spaces) {
-      const content = space.contents?.find(content => content.id === id);
-      if (content) {
-        setYoutubeId(content.youtube_id);
-        setContentId(content.id);
-        break;
-      }
-    }
-
-    if (youtube_id && content_id) {
-      async function fetchData() {
-        try {
-          const response = await axios.get(`/api/spaces/generate/quiz?video_id=${youtube_id}&content_id=${content_id}`, {
-            headers: {
-              Authorization: user?.token ? `Bearer ${user.token}` : ""
-            }
-          });
-          
-          // @ts-expect-error response.data.data type is unknown
-          if (response?.data?.data?.questions) {
-            // @ts-expect-error response.data.data.questions type is unknown
-            setQuizData(response.data.data.questions);
-          }
-        } catch (error) {
-          console.log("error while getting quiz: ", error);
-        } finally {
-          setIsLoading(false);
-        }
-      }
-
-      fetchData();
-    }
-  }, [spaces, id, youtube_id, content_id, activeMainTab, value, user?.token]);
 
   const handleAnswerSelect = (qIndex: number, oIndex: number) => {
     setSelectedAnswers(prev => ({

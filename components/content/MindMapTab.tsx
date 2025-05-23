@@ -2,7 +2,7 @@
 
 import { TabsContent } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import * as go from "gojs";
 import { ReactDiagram } from "gojs-react";
 import { useSpaces } from "@/hooks/space-provider";
@@ -14,83 +14,20 @@ import { Button } from "@/components/ui/button";
 interface MindMapTabProps {
   value: string;
   activeMainTab: string;
-}
-
-interface MindMapData {
-  nodes: {
-    key: number;
-    text: string;
-    category?: string;
-    parent?: number;
-  }[];
-  links: {
-    from: number;
-    to: number;
-  }[];
-}
-
-interface MindMapResponse {
-  data: MindMapData;
+  mindmapData: any;
+  mindmapLoading: boolean;
 }
 
 export default function MindMapTab({
   value,
   activeMainTab,
+  mindmapData,
+  mindmapLoading,
 }: MindMapTabProps) {
   console.log('MindMapTab mounted', { value, activeMainTab });
-  const [mindMapData, setMindMapData] = useState<MindMapData | null>(null);
-  const [youtube_id, setYoutubeId] = useState<string>("");
-  const [content_id, setContentId] = useState<string>("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const { id } = useParams();
   const { spaces } = useSpaces();
   const { user } = useAuth();
-
-  const fetchMindMap = async () => {
-    console.log("Fetching mindmap", youtube_id, content_id);
-    try {
-      setIsLoading(true);
-      setError(null);
-      const response = await axios.get<MindMapResponse>(
-        `/api/spaces/generate/mindmap?video_id=${youtube_id}&content_id=${content_id}`,
-        {
-          headers: {
-            Authorization: user?.token ? `Bearer ${user.token}` : ""
-          }
-        }
-      );
-      if (response.data) {
-        setMindMapData(response.data.data);
-        console.log("Mindmap API data:", response.data.data);
-      }
-    } catch (error) {
-      console.error("Error fetching mindmap:", error);
-      setError("Failed to generate mindmap. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    console.log('Spaces:', spaces, 'id:', id);
-    // Find the content across all spaces
-    for (const space of spaces) {
-      const content = space.contents?.find(content => content.id === id);
-      if (content) {
-        setYoutubeId(content.youtube_id);
-        setContentId(content.id);
-        break;
-      }
-    }
-  }, [spaces, id]);
-
-  useEffect(() => {
-    if (youtube_id && content_id) {
-      fetchMindMap();
-    }
-  }, [youtube_id, content_id, user?.token]);
 
   // Initialize the diagram
   function initDiagram() {
@@ -167,7 +104,7 @@ export default function MindMapTab({
   }
 
   // Dummy mindmap for testing rendering
-  const dummyMindMap: MindMapData = {
+  const dummyMindMap = {
     nodes: [
       { key: 1, text: "Main Topic", category: "root" },
       { key: 2, text: "Subtopic 1", category: "section" },
@@ -188,47 +125,23 @@ export default function MindMapTab({
       {activeMainTab === value && (
         <Card className="h-full flex flex-col p-6 min-h-0">
           <div className="relative flex-1 rounded-lg border bg-white dark:bg-white overflow-hidden" style={{ minHeight: 400, border: '2px solid red' }}>
-            {isLoading ? (
+            {mindmapLoading ? (
               <div className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-white/80">
                 <div className="flex flex-col items-center gap-4">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#5B4B8A]"></div>
                   <p className="text-[#5B4B8A] font-medium">Generating mindmap...</p>
                 </div>
               </div>
-            ) : error ? (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center p-4">
-                  <p className="text-red-500 mb-4">{error}</p>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setError(null);
-                      setIsLoading(true);
-                      // Retry fetching
-                      if (youtube_id && content_id) {
-                        fetchMindMap();
-                      }
-                    }}
-                  >
-                    Try Again
-                  </Button>
-                </div>
-              </div>
-            ) : mindMapData ? (
+            ) : mindmapData ? (
               <ReactDiagram
                 initDiagram={initDiagram}
                 divClassName="diagram-component h-full w-full"
-                nodeDataArray={mindMapData.nodes}
-                linkDataArray={mindMapData.links}
+                nodeDataArray={mindmapData.nodes}
+                linkDataArray={mindmapData.links}
               />
             ) : (
               <div style={{ minHeight: 400, border: '2px solid red' }}>
-                <ReactDiagram
-                  initDiagram={initDiagram}
-                  divClassName="diagram-component h-full w-full"
-                  nodeDataArray={dummyMindMap.nodes}
-                  linkDataArray={dummyMindMap.links}
-                />
+                <p>No mindmap data available.</p>
               </div>
             )}
           </div>

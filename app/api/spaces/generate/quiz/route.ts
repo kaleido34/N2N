@@ -10,7 +10,10 @@ export async function GET(req: NextRequest) {
         const video_id = params.get("video_id");
         const content_id = params.get("content_id");
 
-        const token = req.headers.get("authorization");
+        const authHeader = req.headers.get("authorization");
+        const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : authHeader;
+        console.log('Authorization header received:', authHeader);
+        console.log('JWT secret used:', process.env.JWT_SECRET);
         if (!token) {
             return NextResponse.json({ message: "Missing authorization token." }, { status: 401 });
         }
@@ -103,6 +106,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const token = req.headers.get("authorization");
+        console.log('Authorization header received:', token);
+        console.log('JWT secret used:', process.env.JWT_SECRET);
         if (!token) {
             return NextResponse.json({ message: "Missing authorization token." }, { status: 401 });
         }

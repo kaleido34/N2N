@@ -1,4 +1,5 @@
-import { fetchTranscripts, generateEmbeddings, initializePinecone, preprocessTranscript, transcriptInterface, upsertChunksToPinecone } from "@/lib/utils";
+import { fetchTranscripts, preprocessTranscript, transcriptInterface, upsertChunksToPinecone, initializePinecone } from "@/lib/utils";
+import { generateEmbeddings } from "@/lib/embedding-utils";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma"
 import { v4 as uuid } from "uuid"

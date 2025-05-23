@@ -10,11 +10,11 @@ export async function GET(req: NextRequest) {
         const video_id = params.get("video_id");
         const content_id = params.get("content_id");
 
-        const token = req.headers.get("authorization");
+        let token = req.headers.get("authorization");
         if (!token) {
             return NextResponse.json({ message: "Missing authorization token." }, { status: 401 });
         }
-
+        if (token.startsWith("Bearer ")) token = token.slice(7);
         const user = await verifyJwtToken(token, process.env.JWT_SECRET!);
         if (!user || !user.user_id) {
             return NextResponse.json({ message: "Invalid or expired token." }, { status: 403 });
@@ -93,10 +93,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
     try {
-        const token = req.headers.get("authorization");
+        let token = req.headers.get("authorization");
         if (!token) {
             return NextResponse.json({ message: "Missing authorization token." }, { status: 401 });
         }
+        if (token.startsWith("Bearer ")) token = token.slice(7);
         const user = await verifyJwtToken(token, process.env.JWT_SECRET!);
         if (!user || !user.user_id) {
             return NextResponse.json({ message: "Invalid or expired token." }, { status: 403 });

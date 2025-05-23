@@ -4,17 +4,14 @@ import prisma from "@/lib/prisma";
 import axios from "axios";
 import { v4 as uuid } from "uuid";
 
-// These imports match your original route's transcript & embedding logic
+// Import only what you need from utils and embedding-utils
 import {
-  // fetchTranscript2,
-  fetchTranscripts,
-  // fetchTranscripts,
-  generateEmbeddings,
+    fetchTranscripts,
   initializePinecone,
   preprocessTranscript,
-  transcriptInterface,
-  upsertChunksToPinecone,
+    upsertChunksToPinecone
 } from "@/lib/utils";
+import { generateEmbeddings } from "@/lib/embedding-utils";
 
 // --------------------------------------
 // Helper function to extract YouTube ID
@@ -352,5 +349,3 @@ export async function GET(req: Request) {
 
   return NextResponse.json({ error: "Content not found" }, { status: 404 });
 }
-
-
