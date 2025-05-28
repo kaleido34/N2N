@@ -4,6 +4,7 @@
 import { create } from "zustand";
 import { createContext, useContext, ReactNode, useEffect } from "react";
 import { persist } from "zustand/middleware";
+import { shouldAllowApiCall, markApiCallCompleted } from "@/lib/api-limiter";
 
 // Type definitions
 export interface ContentItem {
@@ -27,6 +28,7 @@ export interface SpaceItem {
 interface SpacesState {
   spaces: SpaceItem[];
   loading: boolean;
+  _lastRefreshTime: number;
 }
 
 interface SpacesActions {
@@ -39,12 +41,19 @@ interface SpacesActions {
   refreshSpaces: (token: string, forceRefresh?: boolean) => Promise<void>;
 }
 
+// Global API call tracker to prevent multiple components from making simultaneous calls
+let isApiCallInProgress = false;
+let apiCallTimeout: NodeJS.Timeout | null = null;
+let lastSuccessfulCallTime = 0;
+const MIN_API_CALL_INTERVAL = 5000; // 5 seconds between API calls
+
 // Create our Zustand store
 export const useSpacesStore = create(
   persist<SpacesState & SpacesActions>(
     (set, get) => ({
       spaces: [],
       loading: true,
+      _lastRefreshTime: 0,
 
       setSpaces: (spaces) => {
         set({ spaces, loading: false });
@@ -92,6 +101,13 @@ export const useSpacesStore = create(
 
       // Reset store on logout
       resetSpaces: () => {
+        // Clear the localStorage cache for spaces
+        try {
+          localStorage.removeItem('spaces-storage');
+        } catch (error) {
+          console.error('Error clearing spaces cache:', error);
+        }
+        
         set((state) => {
           if (state.spaces.length === 0 && !state.loading) return state;
           return {
@@ -101,31 +117,99 @@ export const useSpacesStore = create(
         });
       },
 
+      // Track last refresh time to prevent excessive API calls
+      
       // Refresh spaces list from the server
       async refreshSpaces(token, forceRefresh = false) {
+        const endpoint = "/api/spaces";
+        const now = Date.now();
+        
+        // Enhanced debouncing to prevent repeated API calls
+        if (!forceRefresh) {
+          // Check if we've made a successful call recently
+          if (now - lastSuccessfulCallTime < MIN_API_CALL_INTERVAL) {
+            console.log('[DEBUG] skipping refresh - too soon after last successful call');
+            set({ loading: false });
+            return;
+          }
+          
+          // Use the API limiter as a secondary check
+          if (!shouldAllowApiCall(endpoint, MIN_API_CALL_INTERVAL)) {
+            console.log('[DEBUG] skipping refresh - rate limited');
+            set({ loading: false });
+            return;
+          }
+        }
+        
+        // Prevent multiple simultaneous API calls
+        if (isApiCallInProgress) {
+          console.log('[DEBUG] skipping refresh - another call already in progress');
+          return;
+        }
+        
         const state = get();
         console.log('[DEBUG] refreshSpaces called', { hasToken: !!token, spaces: state.spaces.length, loading: state.loading, forceRefresh });
-        // Only skip refresh if we're not forcing and spaces exist
-        if (!token || (!forceRefresh && state.spaces.length > 0 && !state.loading)) {
-          console.log('[DEBUG] skipping refresh - using cached spaces');
+        
+        // Skip if no token
+        if (!token) {
+          console.log('[DEBUG] skipping refresh - no token');
           set({ loading: false });
           return;
         }
+        
+        // Set flags to prevent duplicate calls
+        isApiCallInProgress = true;
+        
+        // Update last refresh time
+        set({ _lastRefreshTime: now });
         set({ loading: true });
+        
         try {
           console.log('[DEBUG] fetching spaces from API');
-          const res = await fetch("/api/spaces", {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
-          if (!res.ok) throw new Error("Failed to fetch spaces");
-          const { spaces } = await res.json();
-          console.log('[DEBUG] got spaces from API:', spaces.length);
-          set({ spaces, loading: false });
+          try {
+            const res = await fetch(endpoint, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+              // Add cache control to prevent browser caching
+              cache: 'no-store',
+            });
+            
+            // Handle non-OK responses more gracefully
+            if (!res.ok) {
+              console.error(`[ERROR] Failed to fetch spaces: ${res.status} ${res.statusText}`);
+              // Don't throw, just set loading to false and return
+              set({ loading: false });
+              return;
+            }
+            
+            const data = await res.json();
+            
+            // Check if the response has the expected structure
+            if (!data || !data.spaces || !Array.isArray(data.spaces)) {
+              console.error('[ERROR] Unexpected response format from /api/spaces:', data);
+              set({ loading: false });
+              return;
+            }
+            
+            console.log('[DEBUG] got spaces from API:', data.spaces.length);
+            set({ spaces: data.spaces, loading: false });
+            
+            // Update the last successful call time
+            lastSuccessfulCallTime = Date.now();
+          } catch (fetchError) {
+            console.error('[ERROR] Exception while fetching spaces:', fetchError);
+            set({ loading: false });
+          } finally {
+            // Clear the in-progress flag
+            isApiCallInProgress = false;
+            markApiCallCompleted(endpoint);
+          }
         } catch (error) {
           console.error("Error refreshing spaces:", error);
           set({ loading: false });
+          isApiCallInProgress = false;
+          markApiCallCompleted(endpoint);
         }
       },
     }),

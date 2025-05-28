@@ -19,6 +19,7 @@ import { useGlobalLoading } from "@/components/LayoutClient";
 import React from "react";
 import { toast } from "sonner";
 import { BackButton } from "@/components/ui/back-button";
+import { shouldAllowApiCall, markApiCallCompleted } from "@/lib/api-limiter";
 
 interface ContentItem {
   id: string;
@@ -48,45 +49,158 @@ export default function SpacePage() {
   const { setShow } = useGlobalLoading();
 
   const [localContents, setLocalContents] = React.useState<ContentItem[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
   const spaceId = params.id as string;
 
+  // Use a ref to track if a fetch is in progress
+  const isFetchingRef = React.useRef(false);
+  // Use a ref to track if we've already fetched data
+  const hasFetchedRef = React.useRef(false);
+
+  // Track route changes to properly reset state
+  const [routeVersion, setRouteVersion] = React.useState<number>(0);
+  
+  // Track URL query params to force refresh on cache issues
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const forcedRefresh = searchParams?.get('t') || null;
+
+  const fetchSpaceContents = React.useCallback(async () => {
+    if (isFetchingRef.current || !user?.token) return;
+    
+    isFetchingRef.current = true;
+    setIsLoading(true);
+    
+    try {
+      // Add cache busting to prevent stale data
+      const timestamp = Date.now();
+      const endpoint = `/api/spaces?space_id=${spaceId}&_nocache=${timestamp}`;
+      console.log("[DEBUG] Fetching space contents from:", endpoint);
+      
+      const res = await fetch(endpoint, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
+        },
+        next: { revalidate: 0 },
+        cache: 'no-store'
+      });
+      
+      if (!res.ok) {
+        throw new Error("Failed to fetch space contents");
+      }
+      
+      const data = await res.json();
+      console.log("[DEBUG] API response data:", data);
+      
+      if (!data || !data.spaces || !Array.isArray(data.spaces)) {
+        console.error("[ERROR] Invalid API response format:", data);
+        throw new Error("Invalid API response format");
+      }
+      
+      const { spaces } = data;
+      const space = spaces[0];
+      
+      if (space) {
+        console.log("[DEBUG] Found space with", space.contents?.length || 0, "content items");
+        // Always ensure contents is a valid array
+        const safeContents = Array.isArray(space.contents) ? space.contents : [];
+        
+        // Important: Log content items for debugging
+        if (safeContents.length > 0) {
+          console.log("[DEBUG] Content items found:", safeContents.map((c: ContentItem) => ({ id: c.id, type: c.type, title: c.title })));
+        } else {
+          console.log("[DEBUG] No content items found in the space");
+        }
+        
+        setLocalContents(safeContents);
+        // Mark as fetched
+        hasFetchedRef.current = true;
+      } else {
+        console.warn("[DEBUG] No space data found in API response");
+        setLocalContents([]);
+      }
+    } catch (error) {
+      console.error("[ERROR] Error fetching space contents:", error);
+      toast.error("Failed to load space contents");
+      setLocalContents([]);
+    } finally {
+      setIsLoading(false);
+      setShow(false);
+      isFetchingRef.current = false;
+    }
+  }, [spaceId, user?.token, setShow]);
+  
+  // Check for refresh parameters and stored tokens
+  React.useEffect(() => {
+    // Check if we have the fresh parameter in the URL
+    const url = typeof window !== 'undefined' ? window.location.href : '';
+    const isFreshRequest = url.includes('fresh=true');
+    
+    if (isFreshRequest) {
+      console.log('[DEBUG] Detected fresh=true parameter, will force refresh');
+    }
+    
+    // If there's a token in localStorage but user isn't authenticated,
+    // this could be due to navigation issues - try to use the stored token
+    const storedToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    if (storedToken && !isAuthenticated) {
+      console.log('[DEBUG] Found stored token, attempting to use it');
+      // We could trigger authentication here if needed
+    }
+  }, [isAuthenticated]);
+  
+  // Effect to fetch space contents on mount or param change
   React.useEffect(() => {
     let mounted = true;
-
-    const fetchSpaceContents = async () => {
-      try {
-        const res = await fetch(`/api/spaces?space_id=${spaceId}`, {
-          headers: {
-            Authorization: `Bearer ${user?.token}`,
-          },
-        });
-        if (!res.ok) throw new Error("Failed to fetch space contents");
-        const { spaces } = await res.json();
-        const space = spaces[0];
-        if (mounted && space) {
-          setLocalContents(space.contents as ContentItem[]);
+    
+    // Function to initialize component and fetch data
+    const initComponent = async () => {
+      if (!mounted || !isAuthenticated || loading) {
+        if (!isAuthenticated) {
+          console.log('[DEBUG] Not authenticated');
         }
-      } catch (error) {
-        console.error("Error fetching space contents:", error);
-        toast.error("Failed to load space contents");
+        return;
       }
-    };
-
-    if (mounted) {
-      if (!isAuthenticated || loading) {
-        setShow(true);
+      
+      // Always reset fetch state for consistent behavior
+      hasFetchedRef.current = false;
+      
+      // Show loading indicator
+      setShow(true);
+      
+      // Check if this is a forced refresh from URL parameter
+      const url = typeof window !== 'undefined' ? window.location.href : '';
+      const isForceRefresh = url.includes('t=');
+      
+      if (isForceRefresh) {
+        console.log('[DEBUG] Force refresh detected from URL parameter');
+        // We'll do multiple fetches for reliability
+        fetchSpaceContents();
+        
+        // Try again after a short delay in case the first fetch was too early
+        const timer = setTimeout(() => {
+          if (mounted && !hasFetchedRef.current) {
+            console.log('[DEBUG] Retry fetch after delay');
+            fetchSpaceContents();
+          }
+        }, 500);
+        
+        return () => clearTimeout(timer);
       } else {
-        setShow(false);
+        // Regular navigation - just fetch once
         fetchSpaceContents();
       }
-    }
-
-    // Hide overlay on unmount
+    };
+    
+    initComponent();
+    
+    // Cleanup function
     return () => {
       mounted = false;
       setShow(false);
     };
-  }, [isAuthenticated, loading, setShow, user?.token, spaceId]);
+  }, [isAuthenticated, loading, spaceId, fetchSpaceContents, setShow]);
 
   // Show loading state if not authenticated or still loading spaces
   if (!isAuthenticated || loading) {
@@ -101,14 +215,15 @@ export default function SpacePage() {
   }
 
   // Keep this for any future UI differences, but delete will work everywhere
-  const isPersonalWorkspace = spaceData.name === "Personal Workspace";
+  const isPersonalWorkspace = spaceData.name.toLowerCase().includes("personal") && spaceData.name.toLowerCase().includes("workspace");
 
+  // Function to delete content from the workspace
   const handleDeleteContent = async (contentId: string) => {
     try {
       const res = await fetch(`/api/contents/${contentId}`, {
         method: "DELETE",
         headers: {
-          Authorization: `Bearer ${user?.token}`,
+          Authorization: `Bearer ${user.token}`,
         },
       });
       if (!res.ok) throw new Error("Failed to delete lesson");
@@ -130,6 +245,50 @@ export default function SpacePage() {
       if (user?.token && refreshSpaces) {
         await refreshSpaces(user.token, true);
       }
+    }
+  };
+
+  // Function to delete the entire workspace
+  const handleDeleteWorkspace = async () => {
+    if (!user?.token || !spaceId) return;
+    
+    // Don't allow deleting Personal Workspace
+    if (isPersonalWorkspace) {
+      toast.error("You cannot delete your Personal Workspace");
+      return;
+    }
+    
+    // Confirm deletion
+    if (!confirm("Are you sure you want to delete this workspace and all its contents?")) {
+      return;
+    }
+    
+    try {
+      console.log("[DEBUG] Deleting workspace:", spaceId);
+      
+      // Delete the workspace
+      const res = await fetch(`/api/spaces/${spaceId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${user?.token}`,
+        },
+      });
+      
+      if (!res.ok) throw new Error("Failed to delete workspace");
+      
+      toast.success("Workspace deleted successfully!");
+      
+      // Refresh spaces to update the sidebar
+      if (refreshSpaces && user?.token) {
+        await refreshSpaces(user.token, true);
+      }
+      
+      // Navigate back to workspaces page
+      router.push("/dashboard/workspaces");
+      router.refresh();
+    } catch (error) {
+      console.error("[ERROR] Failed to delete workspace:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to delete workspace");
     }
   };
 
@@ -166,14 +325,14 @@ export default function SpacePage() {
                     <FileText className="h-8 w-8 text-white dark:text-white" />
                   </div>
                 )}
-                <div className="p-2">
-                  <h3 className="font-semibold text-white dark:text-white group-hover:text-primary transition-colors text-base mb-0.5 truncate" title={item.title || "Untitled"}>
+                <div className="mt-2">
+                  <h3 className="font-semibold text-gray-900 dark:text-white group-hover:text-primary transition-colors text-base mb-0.5 truncate" title={item.title || "Untitled"}>
                     {item.title || "Untitled"}
                   </h3>
-                  <p className="text-xs text-white dark:text-gray-200 mt-0">
+                  <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
                     {item.createdAt
                       ? new Date(item.createdAt).toLocaleDateString()
-                      : ""}
+                      : "Added recently"}
                   </p>
                 </div>
               </Link>

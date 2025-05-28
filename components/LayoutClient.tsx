@@ -42,14 +42,12 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
     setShow(value);
   }, []);
 
-  // Modified to avoid potential infinite loop
+  // Handle loading overlay for route changes
   useEffect(() => {
-    // Only update when the path actually changes
     if (prevPathRef.current !== pathname) {
       prevPathRef.current = pathname;
 
       // Don't set show true/false in rapid succession
-      // This was likely causing the render loop
       if (pathname !== '/') {
         setShow(true);
 
@@ -61,7 +59,7 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
         return () => clearTimeout(timer);
       }
     }
-  }, [pathname]); // Only depend on pathname
+  }, [pathname]);
 
   return (
     <GlobalLoadingContext.Provider value={{ show, setShow: setShowMemoized }}>

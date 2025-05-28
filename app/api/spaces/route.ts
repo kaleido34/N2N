@@ -38,6 +38,9 @@ export async function GET(req: NextRequest) {
       },
     });
 
+    // Log the request for debugging
+    console.log(`[API] GET /api/spaces request from user ${userId}`);
+    
     // 4) Transform the data into a front-end-friendly shape if needed
     const spaces = userSpaces.map((space) => ({
       id: space.space_id,
@@ -58,7 +61,14 @@ export async function GET(req: NextRequest) {
       })),
     }));
 
-    return NextResponse.json({ spaces }, { status: 200 });
+    // 5) Return the spaces with cache control headers
+    const response = NextResponse.json({ spaces });
+    
+    // Add cache control headers to prevent excessive calls
+    response.headers.set('Cache-Control', 'private, max-age=10');
+    response.headers.set('X-API-Rate-Limit', 'true');
+    
+    return response;
   } catch (error) {
     console.error("Error fetching user spaces:", error);
     return NextResponse.json(

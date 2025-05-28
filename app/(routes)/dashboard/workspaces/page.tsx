@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/auth-provider";
 import { useSpaces } from "@/hooks/space-provider";
@@ -38,40 +38,56 @@ export default function SpacesPage() {
     }
   }, [isAuthenticated, router]);
 
-  // Add effect to fetch spaces
-  const [initialLoad, setInitialLoad] = useState(true);
+  // Add effect to fetch spaces only once when the component mounts
   const [hasFetched, setHasFetched] = useState(false);
+  const isFetchingRef = useRef(false);
+  const mountedRef = useRef(false);
   
   useEffect(() => {
-    console.log('[DEBUG] SpacesPage useEffect', { 
+    // Only run this effect once on component mount
+    if (mountedRef.current) return;
+    mountedRef.current = true;
+    
+    console.log('[DEBUG] SpacesPage mounted', { 
       isAuthenticated, 
       hasToken: !!user?.token, 
       loading,
-      spacesCount: spaces?.length || 0,
-      initialLoad,
-      hasFetched
+      spacesCount: spaces?.length || 0
     });
     
     const fetchSpaces = async () => {
-      if (!isAuthenticated || !user?.token) return;
+      // Don't fetch if we're already loading or if already fetched
+      if (isFetchingRef.current || hasFetched || !isAuthenticated || !user?.token) return;
+      
+      // Set fetching flag to prevent duplicate calls
+      isFetchingRef.current = true;
       
       try {
-        await refreshSpaces(user.token);
+        console.log('[DEBUG] SpacesPage initiating fetch');
+        await refreshSpaces(user.token, true); // Force refresh once on page load
+        setHasFetched(true);
       } catch (error) {
         console.error('Error fetching spaces:', error);
         toast.error('Failed to load workspaces');
       } finally {
-        setInitialLoad(false);
-        setHasFetched(true);
+        // Reset fetching flag after a delay
+        setTimeout(() => {
+          isFetchingRef.current = false;
+        }, 3000);
       }
     };
 
-    // Only fetch on initial load or when authentication state changes
-    if ((initialLoad || !hasFetched) && isAuthenticated && user?.token) {
-      console.log('[DEBUG] Fetching spaces');
+    // Use a slight delay to ensure we don't make redundant calls
+    const timer = setTimeout(() => {
       fetchSpaces();
-    }
-  }, [isAuthenticated, user?.token, initialLoad, hasFetched, refreshSpaces]);
+    }, 100);
+    
+    // Cleanup function
+    return () => {
+      clearTimeout(timer);
+      isFetchingRef.current = false;
+    };
+  }, []); // Empty dependency array ensures this only runs once on mount
 
   // Show loading state if not authenticated or still loading
   if (!isAuthenticated || (loading && !hasFetched)) {
@@ -122,6 +138,8 @@ export default function SpacesPage() {
     }
 
     try {
+      console.log("[DEBUG] Creating new workspace:", name);
+      
       const res = await fetch("/api/spaces", {
         method: "POST",
         headers: {
@@ -135,6 +153,28 @@ export default function SpacesPage() {
         const error = await res.json();
         throw new Error(error.message || "Failed to create space");
       }
+      
+      // Get the newly created workspace data
+      const createdWorkspace = await res.json();
+      console.log("[DEBUG] Workspace created successfully:", createdWorkspace);
+      
+      // Manually add the workspace to the spaces array
+      const newSpace = {
+        id: createdWorkspace.id,
+        name: createdWorkspace.name,
+        createdAt: createdWorkspace.createdAt || new Date().toISOString(),
+        contents: []
+      };
+      
+      // Add the new space to the spaces array
+      addSpace(newSpace);
+      
+      // Force refresh spaces from server to ensure everything is in sync
+      await refreshSpaces(user.token, true);
+      
+      // Instead of a full page refresh, use the router to refresh the current page
+      // This triggers a re-render without a full page reload
+      router.refresh();
     } catch (error) {
       console.error('Error creating space:', error);
       toast.error('Failed to create workspace');
@@ -198,7 +238,7 @@ export default function SpacesPage() {
         </div>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {spaces.map((space) => (
-            <div className="group relative bg-card dark:bg-gray-800 rounded-xl border border-border p-6 hover:shadow-lg transition-all duration-200 hover:-translate-y-1 h-full flex flex-col">
+            <div key={space.id} className="group relative bg-card dark:bg-gray-800 rounded-xl border border-border p-6 hover:shadow-lg transition-all duration-200 hover:-translate-y-1 h-full flex flex-col">
             <div className="flex justify-between items-start mb-2">
               <Link
                 href={`/dashboard/workspaces/${space.id}`}
@@ -208,7 +248,7 @@ export default function SpacesPage() {
                   {space.name}
                 </h3>
               </Link>
-              {space.id !== "personal" && (
+              {!(space.name.toLowerCase().includes("personal") && space.name.toLowerCase().includes("workspace")) && (
                 <div className="absolute top-2 right-2 z-10">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>

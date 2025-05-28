@@ -84,21 +84,32 @@ export async function POST(req: NextRequest) {
     // 3) If no space_id, find or create a "Personal Workspace" for this user
     // ----------------------------------------------------------------------
     if (!spaceId) {
+      // Always create a personal workspace if we don't have a space_id
+      // First try to find an existing one with case-insensitive search
       let defaultSpace = await prisma.space.findFirst({
         where: {
           user_id: userId,
-          space_name: "Personal Workspace",
+          OR: [
+            { space_name: "Personal Workspace" },
+            { space_name: { contains: "personal", mode: "insensitive" } },
+            { space_name: { contains: "workspace", mode: "insensitive" } }
+          ]
         },
       });
 
+      // If no personal workspace exists, create one
       if (!defaultSpace) {
+        console.log("Creating new Personal Workspace for user:", userId);
         defaultSpace = await prisma.space.create({
           data: {
             user_id: userId,
             space_name: "Personal Workspace",
           },
         });
+      } else {
+        console.log("Found existing Personal Workspace:", defaultSpace.space_id);
       }
+      
       spaceId = defaultSpace.space_id;
     }
 
@@ -265,6 +276,9 @@ export async function POST(req: NextRequest) {
     //   }
     
     // We'll respond with 200 either way (new or existing).
+    // Log the response for debugging
+    console.log("Returning content creation response with space_id:", spaceId);
+    
     return NextResponse.json(
       {
         status: "success",
@@ -276,6 +290,15 @@ export async function POST(req: NextRequest) {
           title: videoTitle,
           thumbnail_url: videoThumbnail,
         },
+        // Also include at top level for easier access
+        space_id: spaceId,
+        content_id: contentId,
+        content: {
+          space_id: spaceId,
+          id: contentId,
+          type: "YOUTUBE_CONTENT",
+          title: videoTitle
+        }
       },
       { status: 200 }
     );
