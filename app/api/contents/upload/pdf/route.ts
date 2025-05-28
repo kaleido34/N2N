@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
-import * as pdfjsLib from "pdfjs-dist";
 import prisma from "@/lib/prisma";
 import { v4 as uuid } from "uuid";
+import { generateQuiz, generateFlashCards, generateMindMap, summarizeChunks, transcriptInterface } from "@/lib/utils";
 
 export const config = {
   api: {
@@ -9,16 +9,17 @@ export const config = {
   },
 };
 
-async function extractTextFromPDF(buffer: Buffer): Promise<string> {
-  const loadingTask = pdfjsLib.getDocument({ data: buffer });
-  const pdf = await loadingTask.promise;
-  let text = "";
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    text += content.items.map((item: any) => item.str).join(" ") + "\n";
-  }
-  return text;
+async function extractTextFromPDFWithPython(file: Blob): Promise<string> {
+  const formData = new FormData();
+  formData.append("file", file);
+  // Call the Python extractor server
+  const res = await fetch("http://localhost:5005/extract/pdf", {
+    method: "POST",
+    body: formData,
+  });
+  if (!res.ok) throw new Error("Failed to extract PDF text via Python server");
+  const data = await res.json();
+  return data.text || "";
 }
 
 export async function POST(req: NextRequest) {
@@ -55,11 +56,60 @@ export async function POST(req: NextRequest) {
     finalSpaceId = defaultSpace.space_id;
   }
 
-  const arrayBuffer = await file.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
+  // Extract text from PDF using Python server
+  let text = "";
+  try {
+    text = await extractTextFromPDFWithPython(file);
+  } catch (err) {
+    return new Response("Failed to extract PDF text", { status: 500 });
+  }
 
-  // Extract text from PDF using pdfjs-dist
-  const text = await extractTextFromPDF(buffer);
+  // --- NEW: Split text into transcript-like segments ---
+  function splitTextToTranscript(text: string, segmentWordCount = 60): transcriptInterface[] {
+    const sentences = text.match(/[^.!?\n]+[.!?\n]+/g) || [text];
+    let transcript: transcriptInterface[] = [];
+    let buffer = "";
+    let wordCount = 0;
+    let offset = 0;
+    let idx = 0;
+    for (const sentence of sentences) {
+      const words = sentence.trim().split(/\s+/);
+      buffer += (buffer ? " " : "") + sentence.trim();
+      wordCount += words.length;
+      if (wordCount >= segmentWordCount) {
+        transcript.push({
+          text: buffer,
+          duration: 0, // Not available for docs
+          offset: idx,
+          lang: "en",
+        });
+        idx += wordCount;
+        buffer = "";
+        wordCount = 0;
+      }
+    }
+    if (buffer) {
+      transcript.push({ text: buffer, duration: 0, offset: idx, lang: "en" });
+    }
+    return transcript;
+  }
+
+  const transcriptArr = splitTextToTranscript(text);
+  const transcriptText = transcriptArr.map(t => t.text).join(" ");
+
+  // --- NEW: Generate AI features ---
+  let quiz = null, flashcards = null, mindmap = null, summary = null;
+  try {
+    [quiz, flashcards, mindmap, summary] = await Promise.all([
+      generateQuiz(transcriptText),
+      generateFlashCards(transcriptText),
+      generateMindMap(transcriptText),
+      summarizeChunks(transcriptText),
+    ]);
+  } catch (err) {
+    // If AI fails, continue with what we have
+    console.error("AI generation failed:", err);
+  }
 
   // Create new content/lesson in DB
   const contentId = uuid();
@@ -76,6 +126,11 @@ export async function POST(req: NextRequest) {
           doc_id: docId,
           hash: docId, // (for now, use docId as hash)
           text: text, // Store extracted PDF text
+          quiz: quiz ? JSON.parse(quiz) : null,
+          flashcards: flashcards ? JSON.parse(flashcards) : null,
+          mindmap: mindmap ? JSON.parse(mindmap) : null,
+          summary: summary || null,
+          transcript: JSON.stringify(transcriptArr),
         },
       },
       users: {
@@ -105,9 +160,6 @@ export async function POST(req: NextRequest) {
       content_id: contentId,
     },
   });
-
-  // Optionally, store the extracted text somewhere (e.g., in a separate table or as metadata)
-  // For now, you can use the documentContent table or add a new field if needed
 
   return new Response(JSON.stringify({ contentId, spaceId: finalSpaceId }), { status: 200 });
 }

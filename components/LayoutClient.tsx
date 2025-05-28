@@ -1,8 +1,9 @@
 'use client';
 import { usePathname } from 'next/navigation';
 import { Header } from '@/components/header';
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect, createContext, useContext, useCallback } from 'react';
 import React from 'react';
+import { Toaster } from 'sonner';
 
 const GlobalLoadingContext = createContext<{ show: boolean; setShow: (v: boolean) => void }>({ show: false, setShow: () => {} });
 
@@ -34,25 +35,42 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
   const pathname = usePathname();
   const showHeader = pathname === "/";
   const [show, setShow] = useState(false);
-  const prevPath = React.useRef(pathname);
+  const prevPathRef = React.useRef(pathname);
 
-  // Show overlay for navigation only, no artificial delay
+  // Memoize the setShow function to prevent unnecessary re-renders
+  const setShowMemoized = useCallback((value: boolean) => {
+    setShow(value);
+  }, []);
+
+  // Modified to avoid potential infinite loop
   useEffect(() => {
-    if (prevPath.current !== pathname) {
-      setShow(true);
-      // Hide overlay immediately after path change (or you can debounce if needed)
-      setTimeout(() => setShow(false), 0);
-      prevPath.current = pathname;
+    // Only update when the path actually changes
+    if (prevPathRef.current !== pathname) {
+      prevPathRef.current = pathname;
+
+      // Don't set show true/false in rapid succession
+      // This was likely causing the render loop
+      if (pathname !== '/') {
+        setShow(true);
+
+        // Use a reasonable timeout to hide the overlay
+        const timer = setTimeout(() => {
+          setShow(false);
+        }, 300);
+
+        return () => clearTimeout(timer);
+      }
     }
-  }, [pathname]);
+  }, [pathname]); // Only depend on pathname
 
   return (
-    <GlobalLoadingContext.Provider value={{ show, setShow }}>
-      <GlobalLoadingOverlay show={show} />
+    <GlobalLoadingContext.Provider value={{ show, setShow: setShowMemoized }}>
       <div className="flex min-h-screen flex-col">
         {showHeader && <Header />}
         <main className="flex-1">{children}</main>
       </div>
+      <GlobalLoadingOverlay show={show} />
+      <Toaster position="top-center" richColors closeButton />
     </GlobalLoadingContext.Provider>
   );
-} 
+}

@@ -2,8 +2,10 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { createContext, useContext, ReactNode } from "react";
-import { useSpacesStore } from "@/hooks/space-provider";
+import { createContext, useContext, ReactNode, useEffect } from "react";
+
+// IMPORTANT: Remove direct import of useSpacesStore to break circular dependency
+// import { useSpacesStore } from "@/hooks/space-provider";
 
 // User and Space Interfaces
 interface Space {
@@ -25,6 +27,7 @@ interface User {
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
+  shouldResetSpaces: boolean; // Flag to trigger space reset without direct dependency
 }
 
 interface AuthActions {
@@ -32,6 +35,7 @@ interface AuthActions {
   logout: () => void;
   updateUserSpaces: (spaces: Space[]) => void;
   updateUserData: (updatedData: Partial<User>) => void;
+  clearResetSpacesFlag: () => void;
 }
 
 // Zustand Store
@@ -40,25 +44,30 @@ export const useAuthStore = create(
     (set) => ({
       user: null,
       isAuthenticated: false,
+      shouldResetSpaces: false,
 
-      // Login function
+      // Login function - fixed to avoid direct dependency
       login: (userData: User) => {
-        // Ensure default spaces are added if missing
-        if (!userData.spaces) {
-          userData.spaces = [{ id: "default", name: "Default Space" }];
-        }
-        set({
-          user: userData,
-          isAuthenticated: true,
+        set((state) => {
+          if (state.isAuthenticated && state.user?.user_id === userData.user_id) {
+            return state;
+          }
+
+          // Set flag instead of directly calling another store
+          return {
+            user: userData,
+            isAuthenticated: true,
+            shouldResetSpaces: true
+          };
         });
-        useSpacesStore.getState().resetSpaces();
       },
 
-      // Logout function
+      // Logout function - fixed to avoid direct dependency
       logout: () => {
         set({
           user: null,
           isAuthenticated: false,
+          shouldResetSpaces: true
         });
       },
 
@@ -73,6 +82,10 @@ export const useAuthStore = create(
         set((state) => ({
           user: state.user ? { ...state.user, ...updatedData } : null,
         })),
+
+      // Clear the reset spaces flag
+      clearResetSpacesFlag: () =>
+        set({ shouldResetSpaces: false }),
     }),
     {
       name: "auth-storage", // LocalStorage key
@@ -85,6 +98,20 @@ const AuthContext = createContext<(AuthState & AuthActions) | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const authStore = useAuthStore();
+
+  // Handle the reset spaces flag in the provider component
+  useEffect(() => {
+    if (authStore.shouldResetSpaces) {
+      // Instead of directly calling useSpacesStore, we'll use a more indirect approach
+      // This requires the SpacesProvider to listen for this event
+
+      // Use an event to communicate between stores without direct imports
+      const event = new CustomEvent('auth:resetSpaces', { detail: { triggered: true } });
+      window.dispatchEvent(event);
+      // Clear the flag
+      authStore.clearResetSpacesFlag();
+    }
+  }, [authStore.shouldResetSpaces, authStore.clearResetSpacesFlag]);
 
   return (
     <AuthContext.Provider value={authStore}>{children}</AuthContext.Provider>

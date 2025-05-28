@@ -2,7 +2,7 @@
 "use client";
 
 import { create } from "zustand";
-import { createContext, useContext, ReactNode } from "react";
+import { createContext, useContext, ReactNode, useEffect } from "react";
 import { persist } from "zustand/middleware";
 
 // Type definitions
@@ -36,7 +36,7 @@ interface SpacesActions {
   createSpace: (token: string, name: string) => Promise<void>;
   addContentToSpace: (spaceId: string, content: ContentItem) => void;
   resetSpaces: () => void;
-  refreshSpaces: (token: string) => Promise<void>;
+  refreshSpaces: (token: string, forceRefresh?: boolean) => Promise<void>;
 }
 
 // Create our Zustand store
@@ -46,10 +46,16 @@ export const useSpacesStore = create(
       spaces: [],
       loading: true,
 
-      setSpaces: (spaces) => set({ spaces }),
+      setSpaces: (spaces) => {
+        set({ spaces, loading: false });
+      },
 
       addSpace: (space) =>
-        set((state) => ({ spaces: [...state.spaces, space] })),
+        set((state) => {
+          const existing = state.spaces.find(s => s.id === space.id);
+          if (existing) return state;
+          return { spaces: [...state.spaces, space] };
+        }),
 
       setLoading: (val) => set({ loading: val }),
 
@@ -86,16 +92,28 @@ export const useSpacesStore = create(
 
       // Reset store on logout
       resetSpaces: () => {
-        set({
-          spaces: [],
-          loading: true,
+        set((state) => {
+          if (state.spaces.length === 0 && !state.loading) return state;
+          return {
+            spaces: [],
+            loading: true,
+          };
         });
       },
 
       // Refresh spaces list from the server
-      async refreshSpaces(token) {
+      async refreshSpaces(token, forceRefresh = false) {
+        const state = get();
+        console.log('[DEBUG] refreshSpaces called', { hasToken: !!token, spaces: state.spaces.length, loading: state.loading, forceRefresh });
+        // Only skip refresh if we're not forcing and spaces exist
+        if (!token || (!forceRefresh && state.spaces.length > 0 && !state.loading)) {
+          console.log('[DEBUG] skipping refresh - using cached spaces');
+          set({ loading: false });
+          return;
+        }
         set({ loading: true });
         try {
+          console.log('[DEBUG] fetching spaces from API');
           const res = await fetch("/api/spaces", {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -103,11 +121,11 @@ export const useSpacesStore = create(
           });
           if (!res.ok) throw new Error("Failed to fetch spaces");
           const { spaces } = await res.json();
+          console.log('[DEBUG] got spaces from API:', spaces.length);
           set({ spaces, loading: false });
         } catch (error) {
           console.error("Error refreshing spaces:", error);
           set({ loading: false });
-          throw error;
         }
       },
     }),
@@ -121,6 +139,21 @@ const SpacesContext = createContext<(SpacesState & SpacesActions) | null>(null);
 
 export function SpacesProvider({ children }: { children: ReactNode }) {
   const store = useSpacesStore();
+
+  // Listen for reset events from AuthProvider instead of direct function calls
+  // This breaks the circular dependency
+  useEffect(() => {
+    const handleResetSpaces = () => {
+      console.log("Spaces reset triggered by auth event");
+      store.resetSpaces();
+    };
+
+    window.addEventListener('auth:resetSpaces', handleResetSpaces);
+    return () => {
+      window.removeEventListener('auth:resetSpaces', handleResetSpaces);
+    };
+  }, [store]);
+
   return (
     <SpacesContext.Provider value={store}>{children}</SpacesContext.Provider>
   );

@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuIconButton, // <-- import the icon button
 } from "@/components/ui/dropdown-menu";
 import { CreateSpaceDialog } from "@/components/create-space-dialog";
 import { useSpaces } from "@/hooks/space-provider";
@@ -32,18 +33,13 @@ export default function DashboardSidebar({ minimized, setMinimized }: { minimize
   const router = useRouter ? useRouter() : { push: () => {} };
   const getInitials = (name: string) => name?.split(" ").map((part: string) => part[0]).join("").toUpperCase();
 
-  // Find the default/personal workspace
-  const defaultWorkspace = spaces.find(
-    (space) => space.id === "default" || space.name.toLowerCase().includes("default")
-  );
-  // Defensive: fallback to empty array if not found
-  const lessonHistory = defaultWorkspace?.contents || [];
+  // Find the personal workspace by exact name (case-insensitive)
+  const personalWorkspace = spaces.find(space => space.name.trim().toLowerCase() === "personal workspace");
+  const lessonHistory = personalWorkspace?.contents || [];
 
-  // Local state for deleting lessons from history (optimistic update)
-  const [history, setHistory] = React.useState(lessonHistory);
-  React.useEffect(() => {
-    setHistory(lessonHistory);
-  }, [lessonHistory]);
+  // Debug: Log spaces and lessonHistory for troubleshooting
+  console.log('[DEBUG] DashboardSidebar spaces:', spaces);
+  console.log('[DEBUG] DashboardSidebar lessonHistory:', lessonHistory);
 
   // Delete lesson handler
   const handleDeleteLesson = async (lessonId: string) => {
@@ -55,13 +51,11 @@ export default function DashboardSidebar({ minimized, setMinimized }: { minimize
         headers: { Authorization: `Bearer ${user.token}` },
       });
       if (!res.ok) throw new Error("Failed to delete lesson");
-      // Optimistically update UI
-      setHistory((prev) => prev.filter((item) => item.id !== lessonId));
-      // Also update global store
-      if (defaultWorkspace) {
+      // No need to update local state, global store will update lessonHistory
+      if (personalWorkspace) {
         setSpaces(
           spaces.map((space) =>
-            space.id === defaultWorkspace.id
+            space.id === personalWorkspace.id
               ? { ...space, contents: (space.contents || []).filter((item) => item.id !== lessonId) }
               : space
           )
@@ -108,10 +102,12 @@ export default function DashboardSidebar({ minimized, setMinimized }: { minimize
     }
   }
 
+  console.log('DashboardSidebar render', { minimized });
+
   return (
-    <aside className={`flex flex-col h-screen bg-white/80 dark:bg-[#18132A]/80 border-r border-sidebar-border transition-all duration-300 z-50 ${minimized ? 'w-16' : 'w-64'} relative ${!minimized ? 'pl-3' : ''}`}> 
+    <aside className={`flex flex-col h-screen bg-white/80 dark:bg-[#11001C] border-r border-sidebar-border transition-all duration-300 z-50 ${minimized ? 'w-16' : 'w-64'} relative ${!minimized ? 'pl-3' : ''}`}> 
       {/* Header */}
-      <div className={`flex items-center justify-between px-3 pt-5 pb-5 border-b border-sidebar-border bg-white/80 dark:bg-[#18132A]/80 ${minimized ? '' : ''}`}>
+      <div className={`flex items-center justify-between px-3 pt-5 pb-5 border-b border-sidebar-border bg-white/80 dark:bg-[#11001C] ${minimized ? '' : ''}`}>
         {!minimized && (
           <Link href="/" className="flex items-center gap-2 group">
             <Image src="/logo.png" alt="Logo" width={40} height={40} className="rounded-lg shadow-sm transition-transform duration-200 group-hover:scale-110" />
@@ -124,7 +120,32 @@ export default function DashboardSidebar({ minimized, setMinimized }: { minimize
       </div>
 
       {/* Main Scrollable Area */}
-      <div className={`flex-1 overflow-y-auto py-4 flex flex-col gap-3 bg-transparent border-r-0 ${!minimized ? 'px-2' : ''}`}>
+      <div className={`flex-1 overflow-y-auto py-4 flex flex-col gap-3 bg-transparent border-r-0 ${!minimized ? 'px-2' : ''} 
+        scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent scrollbar-thumb-rounded-md dark:scrollbar-thumb-gray-600`}>
+        {/* Custom scrollbar styles */}
+        <style jsx>{`
+          .scrollbar-thin::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+          }
+          .scrollbar-thin::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          .scrollbar-thin::-webkit-scrollbar-thumb {
+            background-color: #c1c1c1;
+            border-radius: 4px;
+          }
+          .dark .scrollbar-thin::-webkit-scrollbar-thumb {
+            background-color: #4b5563;
+          }
+          .scrollbar-thin {
+            scrollbar-width: thin;
+            scrollbar-color: #c1c1c1 transparent;
+          }
+          .dark .scrollbar-thin {
+            scrollbar-color: #4b5563 transparent;
+          }
+        `}</style>
         {/* New Lesson Button */}
         {minimized ? (
           <button
@@ -137,41 +158,43 @@ export default function DashboardSidebar({ minimized, setMinimized }: { minimize
           </button>
         ) : (
           <Button 
-            className="w-full justify-start pl-2 pr-6 font-semibold bg-transparent hover:bg-[#E58C5A]/10 text-[#232323] dark:text-white shadow-none rounded-lg my-1 transition-colors group"
+            className="w-full justify-start pl-2 pr-6 font-semibold bg-transparent hover:bg-[#f3f0ff] dark:hover:bg-[#FFA07A]/40 text-[#232323] dark:text-white shadow-none rounded-lg my-1 transition-colors group"
             onClick={() => router.push('/dashboard')}
           >
-            <span className="inline-flex items-center justify-center h-9 w-9 rounded-lg bg-gradient-to-br from-[#7B5EA7]/20 to-[#E58C5A]/20 group-hover:from-[#7B5EA7]/40 group-hover:to-[#E58C5A]/40 mr-3 transition-colors">
+            <span className="inline-flex items-center justify-center h-9 w-9 rounded-lg bg-gradient-to-br from-[#7B5EA7]/20 to-[#E58C5A]/20 group-hover:from-[#7B5EA7]/40 group-hover:to-[#E58C5A]/40 dark:group-hover:bg-[#E58C5A]/40 mr-3 transition-colors">
               <BookOpen className="h-6 w-6 text-[#7B5EA7] dark:text-[#C7AFFF]" />
             </span>
             New Lesson
           </Button>
         )}
+
         {/* Visit Workspace Button */}
         {minimized ? (
           <button
-            className="flex items-center justify-center h-9 w-9 mx-auto rounded-lg bg-[#F3F0FF] dark:bg-[#23223A] hover:bg-[#7B5EA7]/20 focus:outline-none focus:ring-2 focus:ring-[#7B5EA7] transition-colors"
+            className="flex items-center justify-center h-9 w-9 mx-auto rounded-lg bg-[#F3F0FF] dark:bg-[#23223A] hover:bg-[#7B5EA7]/20 dark:hover:bg-[#E58C5A]/20 focus:outline-none focus:ring-2 focus:ring-[#7B5EA7] transition-colors"
             onClick={() => router.push('/dashboard/workspaces')}
-            aria-label="Visit Workspace"
+            aria-label="Visit Workspaces"
             type="button"
           >
             <FolderOpen className="h-5 w-5 text-[#7B5EA7] dark:text-[#C7AFFF]" />
           </button>
         ) : (
           <Button
-            className="w-full justify-start pl-2 pr-6 font-semibold bg-transparent hover:bg-[#7B5EA7]/10 text-[#232323] dark:text-white shadow-none rounded-lg my-1 transition-colors group"
+            className="w-full justify-start pl-2 pr-6 font-semibold bg-transparent hover:bg-[#f3f0ff] dark:hover:bg-[#FFA07A]/40 text-[#232323] dark:text-white shadow-none rounded-lg my-1 transition-colors group"
             onClick={() => router.push('/dashboard/workspaces')}
           >
-            <span className="inline-flex items-center justify-center h-9 w-9 rounded-lg bg-[#F3F0FF] dark:bg-[#23223A] group-hover:bg-[#7B5EA7]/20 mr-3 transition-colors">
+            <span className="inline-flex items-center justify-center h-9 w-9 rounded-lg bg-[#F3F0FF] dark:bg-[#23223A] group-hover:bg-[#f3f0ff] dark:group-hover:bg-[#FFA07A]/40 mr-3 transition-colors">
               <FolderOpen className="h-6 w-6 text-[#7B5EA7] dark:text-[#C7AFFF]" />
             </span>
-            Visit Workspace
+            Visit Workspaces
           </Button>
         )}
+
         {/* Create Workspace Button */}
         {minimized ? (
           <CreateSpaceDialog onCreateSpace={handleCreateSpace}>
             <button
-              className="flex items-center justify-center h-9 w-9 mx-auto rounded-lg bg-[#FFF6ED] dark:bg-[#2A1A13] hover:bg-[#E58C5A]/20 focus:outline-none focus:ring-2 focus:ring-[#E58C5A] transition-colors"
+              className="flex items-center justify-center h-9 w-9 mx-auto rounded-lg bg-[#FFF6ED] dark:bg-[#2A1A13] hover:bg-[#E58C5A]/20 dark:hover:bg-[#E58C5A]/40 focus:outline-none focus:ring-2 focus:ring-[#E58C5A] transition-colors"
               aria-label="Create Workspace"
               type="button"
             >
@@ -180,40 +203,42 @@ export default function DashboardSidebar({ minimized, setMinimized }: { minimize
           </CreateSpaceDialog>
         ) : (
           <CreateSpaceDialog onCreateSpace={handleCreateSpace}>
-            <Button className="w-full justify-start pl-2 pr-6 font-semibold bg-transparent hover:bg-[#E58C5A]/10 text-[#232323] dark:text-white shadow-none rounded-lg my-1 transition-colors group">
-              <span className="inline-flex items-center justify-center h-9 w-9 rounded-lg bg-[#FFF6ED] dark:bg-[#2A1A13] group-hover:bg-[#E58C5A]/20 mr-3 transition-colors">
+            <Button className="w-full justify-start pl-2 pr-6 font-semibold bg-transparent hover:bg-[#f3f0ff] dark:hover:bg-[#E58C5A]/30 text-[#232323] dark:text-white shadow-none rounded-lg my-1 transition-colors group">
+              <span className="inline-flex items-center justify-center h-9 w-9 rounded-lg bg-[#FFF6ED] dark:bg-[#2A1A13] group-hover:bg-[#f3f0ff] dark:group-hover:bg-[#E58C5A]/40 mr-3 transition-colors">
                 <Plus className="h-6 w-6 text-[#E58C5A] dark:text-[#E58C5A]" />
               </span>
               Create Workspace
             </Button>
           </CreateSpaceDialog>
         )}
+
         {/* History Section (only in expanded mode) */}
         {!minimized && (
           <div className="mt-6">
             <div className="mb-2 text-xs font-semibold text-[#E58C5A] dark:text-[#E58C5A] uppercase tracking-wide pl-6">History</div>
             <div className="flex flex-col gap-1">
-              {history.length === 0 && (
-                <div className="text-xs text-muted-foreground pl-6 py-2">No lessons yet.</div>
+              {lessonHistory.length === 0 && (
+                <div className="text-xs text-muted-foreground dark:text-white pl-6 py-2">No lessons yet.</div>
               )}
-              {history.map(lesson => (
+              {lessonHistory.map(lesson => (
                 <div
                   key={lesson.id}
-                  className="truncate text-xs text-[#232323] px-2 py-1 group hover:bg-[#f3f0ff] dark:hover:bg-[#23223a] rounded transition cursor-pointer pl-6 flex items-center justify-between"
+                  className="truncate text-xs text-[#232323] dark:text-white px-2 py-1 group hover:bg-[#f3f0ff] dark:hover:bg-[#23223a] rounded transition cursor-pointer pl-6 flex items-center justify-between"
                 >
                   <span className="truncate max-w-[120px]">{lesson.title || 'Untitled'}</span>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="ml-2 opacity-70 group-hover:opacity-100 hover:bg-[#E58C5A]/20 dark:hover:bg-[#E58C5A]/30 transition"
-                      >
+                      <DropdownMenuIconButton aria-label="Lesson options">
                         <MoreVertical className="h-4 w-4" />
-                      </Button>
+                      </DropdownMenuIconButton>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem className="text-red-500" onClick={() => handleDeleteLesson(lesson.id)}>Delete</DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-red-500"
+                        onClick={() => handleDeleteLesson(lesson.id)}
+                      >
+                        Delete
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -228,12 +253,20 @@ export default function DashboardSidebar({ minimized, setMinimized }: { minimize
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Avatar className="h-9 w-9 cursor-pointer shadow-sm hover:shadow-md transition-all duration-200">
-              <AvatarFallback className="bg-[#66529C] text-white font-semibold">{user?.name ? getInitials(user.name) : "U"}</AvatarFallback>
+              <AvatarFallback className="bg-[#66529C] text-white font-semibold">
+                {user?.name ? getInitials(user.name) : "U"}
+              </AvatarFallback>
             </Avatar>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="p-2 dark:bg-[#18132A] rounded-xl shadow-lg">
-            <DropdownMenuItem onSelect={() => router.push && router.push("/settings")}> <Settings className="mr-2 h-4 w-4" /> <span>Settings</span> </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => logout && logout()}> <LogOut className="mr-2 h-4 w-4" /> <span>Log out</span> </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => router.push && router.push("/settings")}>
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Settings</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => logout && logout()}>
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Log out</span>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         {/* Theme toggle only in expanded mode */}

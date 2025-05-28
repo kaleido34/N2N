@@ -1,0 +1,28 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  // ...existing model definitions...
+}
+
+model DocumentContent {
+  content_id String  @id @default(uuid())
+  filename   String  @db.VarChar(255)
+  file_url   String  @db.VarChar(255)
+  doc_id     String  @unique
+  hash       String  @unique
+  text       String?
+  flashcards Json?
+  mindmap    Json?
+  quiz       Json?
+  summary    String?
+  transcript Json?
+  content    Content @relation(fields: [content_id], references: [content_id], onDelete: Cascade)
+}

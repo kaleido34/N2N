@@ -58,8 +58,6 @@ export async function GET(req: NextRequest) {
       })),
     }));
 
-    console.log("[API /api/spaces] Returning spaces:", spaces);
-
     return NextResponse.json({ spaces }, { status: 200 });
   } catch (error) {
     console.error("Error fetching user spaces:", error);

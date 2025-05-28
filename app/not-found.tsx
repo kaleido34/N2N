@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 
 export default function NotFound() {
   return (
-    <div className="fixed inset-0 min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-[#F3F0FF] via-[#FAF7F8] to-[#E9E3FF] dark:from-[#18132A] dark:via-[#23223A] dark:to-[#1E1A2E] overflow-hidden">
+    <div className="fixed inset-0 min-h-screen w-full flex items-center justify-center bg-[#F3F0FF] dark:bg-[#18132A] overflow-hidden">
       {/* Return to Home Button styled like BackButton */}
       <div className="absolute top-8 left-8 z-10">
         <Link
@@ -15,7 +15,7 @@ export default function NotFound() {
           Return Home
         </Link>
       </div>
-      <div className="w-full max-w-2xl mx-auto bg-white/90 dark:bg-[#23223A]/90 rounded-3xl shadow-2xl p-14 flex flex-col items-center">
+      <div className="w-full max-w-2xl mx-auto rounded-3xl p-14 flex flex-col items-center bg-transparent -mt-10">
         <h1 className="text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[#E5735A] to-[#7B5EA7] mb-2">
           404
         </h1>

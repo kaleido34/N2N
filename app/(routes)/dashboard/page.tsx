@@ -1,39 +1,47 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/auth-provider";
 import { useSpaces } from "@/hooks/space-provider";
+
+
+import { ContentForm } from "@/components/dashboard/ContentForm";
 import { BackButton } from "@/components/ui/back-button";
 
 export default function DashboardPage() {
   const { isAuthenticated } = useAuth();
   const { loading } = useSpaces();
+  const [minimized, setMinimized] = useState(false);
+
   const router = useRouter();
 
-  // If not authenticated, redirect.
+  // Use CSS class instead of direct DOM manipulation
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.replace("/signin");
-    }
-    // Hide scrollbar on mount
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    // Add the class to the body when component mounts
+    document.body.classList.add('dashboard-page');
+    
+    // Remove the class when component unmounts
     return () => {
-      document.body.style.overflow = originalOverflow;
+      document.body.classList.remove('dashboard-page');
     };
-  }, [isAuthenticated, router]);
+  }, []); // Empty dependency array means this runs once on mount and cleanup on unmount
+
 
   // Show a loading state until we have spaces from the store.
-  if (!isAuthenticated || loading) {
+  if (!isAuthenticated) {
     return <p>Loading...</p>;
   }
 
   return (
-    <>
-      <div className="fixed top-6 right-6 z-50">
-        <BackButton />
+    <main className="relative min-h-screen w-full bg-transparent">
+      <BackButton onClick={() => router.push("/")} className="absolute top-8 right-8" />
+      <div className="flex flex-col items-center justify-center min-h-screen w-full">
+        <h1 className="text-7xl font-extrabold text-center mb-10 text-[#5B4B8A] dark:text-white leading-none whitespace-nowrap">
+          What are you learning today?
+        </h1>
+        <ContentForm />
       </div>
-    </>
+    </main>
   );
 }

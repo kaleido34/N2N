@@ -38,8 +38,9 @@ export default function LeftPanel({
 
   // Transcript parser function
   const parseTranscript = (
-    rawTranscript: TranscriptSegment[]
+    rawTranscript: TranscriptSegment[] | undefined | null
   ): TranscriptSegment[] => {
+    if (!Array.isArray(rawTranscript)) return [];
     return rawTranscript.map((segment) => ({
       ...segment,
       text: segment.text.replace(/&amp;#39;/g, "'"), // Replace all occurrences of &amp;#39; with '
@@ -51,12 +52,16 @@ export default function LeftPanel({
       const res = await fetch(`/api/contents?id=${id}`);
       if (!res.ok) throw new Error("Failed to fetch video details");
       const data = await res.json();
-      console.log('API /api/contents?id=' + id + ' response:', data); // Debug log
+      // REMOVE noisy debug logs
       setYoutube_id(data.youtube_id);
       setThumbnailUrl(data.thumbnailUrl || null);
-      // Parse and set the transcript
-      const parsedTranscript = parseTranscript(data.transcript);
-      setTranscript(parsedTranscript);
+      // Only parse transcript if it exists (YOUTUBE_CONTENT)
+      if (data.transcript) {
+        const parsedTranscript = parseTranscript(data.transcript);
+        setTranscript(parsedTranscript);
+      } else {
+        setTranscript([]);
+      }
     } catch (error) {
       console.error("Error fetching transcript and video details:", error);
     }

@@ -4,15 +4,8 @@ import prisma from "@/lib/prisma";
 import axios from "axios";
 import { v4 as uuid } from "uuid";
 
-// Import only what you need from utils and embedding-utils
-import {
-    fetchTranscripts,
-  initializePinecone,
-  preprocessTranscript,
-    upsertChunksToPinecone
-} from "@/lib/utils";
-import { generateEmbeddings } from "@/lib/embedding-utils";
-
+// Import only what you need - remove embedding-related imports
+import { fetchTranscripts, preprocessTranscript, transcriptInterface } from "@/lib/utils";
 // --------------------------------------
 // Helper function to extract YouTube ID
 // --------------------------------------
@@ -81,7 +74,6 @@ export async function POST(req: NextRequest) {
     let spaceId: string | undefined = body.space_id;
 
     if (!youtube_url) {
-      console.log("youtube_url is required");
       return NextResponse.json(
         { error: "youtube_url is required" },
         { status: 400 }
@@ -89,13 +81,13 @@ export async function POST(req: NextRequest) {
     }
 
     // ----------------------------------------------------------------------
-    // 3) If no space_id, find or create a "Default" space for this user
+    // 3) If no space_id, find or create a "Personal Workspace" for this user
     // ----------------------------------------------------------------------
     if (!spaceId) {
       let defaultSpace = await prisma.space.findFirst({
         where: {
           user_id: userId,
-          space_name: "Default",
+          space_name: "Personal Workspace",
         },
       });
 
@@ -103,7 +95,7 @@ export async function POST(req: NextRequest) {
         defaultSpace = await prisma.space.create({
           data: {
             user_id: userId,
-            space_name: "Default",
+            space_name: "Personal Workspace",
           },
         });
       }
@@ -115,7 +107,6 @@ export async function POST(req: NextRequest) {
     // ----------------------------------------------------------------------
     const videoId = extractYoutubeId(youtube_url);
     if (!videoId) {
-      console.log("Could not extract valid video ID from youtube_url");
       return NextResponse.json(
         { error: "Could not extract valid video ID from youtube_url" },
         { status: 400 }
@@ -123,14 +114,27 @@ export async function POST(req: NextRequest) {
     }
 
     // Fetch transcripts from your existing utility
-    const transcript: transcriptInterface[] | null = await fetchTranscripts(
-      videoId
-    );
+    let transcript: transcriptInterface[] | null;
+    try {
+      transcript = await fetchTranscripts(videoId);
       if (!transcript || transcript.length === 0) {
-        console.log("Error extracting transcripts or no transcripts found");
+        console.log('No transcript available for video:', videoId);
         return NextResponse.json(
-          { error: "Error extracting transcripts or no transcripts found" },
-          { status: 400 }
+          { 
+            error: "NO_TRANSCRIPT",
+            message: "This video doesn't have any transcript available. Transcripts may be disabled by the video owner."
+          },
+          { status: 200 } // Using 200 to prevent showing as error in UI
+        );
+      }
+    } catch (error) {
+      console.error('Error fetching transcript for video:', videoId, 'Error:', error);
+      return NextResponse.json(
+        { 
+          error: "TRANSCRIPT_ERROR",
+          message: "Unable to fetch transcript for this video. Transcripts may be disabled or not available."
+        },
+        { status: 200 } // Using 200 to prevent showing as error in UI
       );
     }
 
@@ -174,7 +178,6 @@ export async function POST(req: NextRequest) {
     // ----------------------------------------------------------------------
     if (existingYoutubeContent) {
       contentId = existingYoutubeContent.content_id;
-      console.log("YouTube content already exists: ", contentId);
 
       // Check if this user already has a user->content record
       const userContentRecord = await prisma.userContent.findUnique({
@@ -225,23 +228,10 @@ export async function POST(req: NextRequest) {
           },
         },
       });
-      console.log("Created new content & youtubeContent with ID:", contentId);
 
-      try {
-        // 7B) Vector Embeddings (Pinecone)
-        //     (Only do this once for brand-new videos)
-        const pineconeIndex = await initializePinecone();
-        const embeddedChunks = await generateEmbeddings(
-          processedTranscriptChunks,
-          videoId
-        );
-        await upsertChunksToPinecone(pineconeIndex, embeddedChunks);
-      } catch (error) {
-        console.error("Error during embedding generation:", error);
-        // Continue execution even if embeddings fail
-      }
+      // 7B) Skip vector embeddings
+      console.log("Skipping embeddings generation");
     }
-
     // ----------------------------------------------------------------------
     // 8) Link the content to the chosen space (via SpaceContent pivot)
     // ----------------------------------------------------------------------
@@ -257,6 +247,12 @@ export async function POST(req: NextRequest) {
         content_id: contentId,
       },
       update: {},
+    });
+
+    // Debug: List all content IDs for this space after upsert
+    const spaceWithContents = await prisma.space.findUnique({
+      where: { space_id: spaceId },
+      include: { contents: true },
     });
 
     // ----------------------------------------------------------------------
@@ -295,8 +291,6 @@ export async function POST(req: NextRequest) {
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id"); // Extract ID from query parameters
-
-  console.log("here", id);
 
   if (!id) {
     return NextResponse.json({ error: "ID is required" }, { status: 400 });

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchTranscripts, preprocessTranscript, initializePinecone, upsertChunksToPinecone } from "@/lib/utils";
-import { generateEmbeddings } from "@/lib/embedding-utils";
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,14 +14,12 @@ export async function POST(req: NextRequest) {
     }
     // 2. Preprocess transcript
     const processedChunks = await preprocessTranscript(transcript);
-    // 3. Generate embeddings
-    const embeddedChunks = await generateEmbeddings(processedChunks, video_id);
-    // 4. Upsert to Pinecone
-    const pineconeIndex = await initializePinecone();
-    await upsertChunksToPinecone(pineconeIndex, embeddedChunks);
-    return NextResponse.json({ success: true, message: "Re-indexed successfully" });
+    // 3. Upsert to Pinecone (if needed)
+    // const pineconeIndex = await initializePinecone();
+    // await upsertChunksToPinecone(pineconeIndex, embeddedChunks);
+    return NextResponse.json({ success: true, message: "Re-indexed successfully (embeddings removed)" });
   } catch (error) {
     console.error("Error in reindex-embeddings:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-} 
+}

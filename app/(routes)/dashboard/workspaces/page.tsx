@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/auth-provider";
 import { useSpaces } from "@/hooks/space-provider";
-import type { SpaceItem } from "@/hooks/space-provider";
-import { Box, MoreVertical } from "lucide-react";
+import { CreateSpaceDialog } from "@/components/create-space-dialog";
+import { Briefcase, MoreVertical, PlusCircle, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { BackButton } from "@/components/ui/back-button";
@@ -14,16 +14,23 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuIconButton,
 } from "@/components/ui/dropdown-menu";
-import { useGlobalLoading } from "@/components/LayoutClient";
 import { toast } from "sonner";
 
-export default function WorkspacesPage() {
+export default function SpacesPage() {
   const { isAuthenticated, user } = useAuth();
-  const { spaces, loading } = useSpaces();
+  const { spaces, loading, addSpace, refreshSpaces } = useSpaces();
   const router = useRouter();
-  const { show, setShow } = useGlobalLoading();
-  const [localSpaces, setLocalSpaces] = useState(spaces);
+
+  console.log('[DEBUG] SpacesPage render', { 
+    isAuthenticated, 
+    hasToken: !!user?.token,
+    loading,
+    spacesCount: spaces.length 
+  });
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -31,99 +38,215 @@ export default function WorkspacesPage() {
     }
   }, [isAuthenticated, router]);
 
+  // Add effect to fetch spaces
+  const [initialLoad, setInitialLoad] = useState(true);
+  const [hasFetched, setHasFetched] = useState(false);
+  
   useEffect(() => {
-    console.log("[WorkspacesPage] spaces:", spaces);
-    setLocalSpaces(spaces);
-  }, [spaces]);
+    console.log('[DEBUG] SpacesPage useEffect', { 
+      isAuthenticated, 
+      hasToken: !!user?.token, 
+      loading,
+      spacesCount: spaces?.length || 0,
+      initialLoad,
+      hasFetched
+    });
+    
+    const fetchSpaces = async () => {
+      if (!isAuthenticated || !user?.token) return;
+      
+      try {
+        await refreshSpaces(user.token);
+      } catch (error) {
+        console.error('Error fetching spaces:', error);
+        toast.error('Failed to load workspaces');
+      } finally {
+        setInitialLoad(false);
+        setHasFetched(true);
+      }
+    };
 
-  if (!isAuthenticated || loading) {
-    return <p>Loading...</p>;
+    // Only fetch on initial load or when authentication state changes
+    if ((initialLoad || !hasFetched) && isAuthenticated && user?.token) {
+      console.log('[DEBUG] Fetching spaces');
+      fetchSpaces();
+    }
+  }, [isAuthenticated, user?.token, initialLoad, hasFetched, refreshSpaces]);
+
+  // Show loading state if not authenticated or still loading
+  if (!isAuthenticated || (loading && !hasFetched)) {
+    return (
+      <div className="min-h-full flex flex-col items-center justify-center dark:bg-gray-900 py-20">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#5B4B8A]"></div>
+      </div>
+    );
   }
 
+  // Show empty state if there are no spaces
+  if (!spaces || spaces.length === 0) {
+    return (
+      <div className="min-h-full dark:bg-gray-900">
+        <main className="container py-6 px-4 md:px-8">
+          <div className="flex justify-between items-start w-full mb-8">
+            <h2 className="text-4xl font-bold tracking-tight pt-4" style={{color: '#5B4B8A'}}>
+              My Workspace
+            </h2>
+            <BackButton onClick={() => router.push("/dashboard")} />
+          </div>
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="text-center max-w-md">
+              <h2 className="text-2xl font-bold mb-8 text-center text-[#5B4B8A]">
+                No workspaces yet
+              </h2>
+              <p className="mb-16 text-muted-foreground text-left">
+                You haven't created any workspaces yet. Create a new workspace to keep your videos, documents, and other content neatly organized!
+              </p>
+              <div className="flex justify-center">
+                <CreateSpaceDialog onCreateSpace={handleCreateSpace}>
+                  <Button className="bg-[#5B4B8A] hover:bg-[#4a3a6a] text-white">
+                    Create Workspace
+                  </Button>
+                </CreateSpaceDialog>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  async function handleCreateSpace(name: string) {
+    if (!user?.token) {
+      toast.error("You must be logged in to create a workspace");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/spaces", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${user.token}`,
+        },
+        body: JSON.stringify({ name }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to create space");
+      }
+    } catch (error) {
+      console.error('Error creating space:', error);
+      toast.error('Failed to create workspace');
+      throw error;
+    }
+  };
+
+  // Handle space deletion
   const handleDeleteSpace = async (spaceId: string) => {
     if (!user?.token) return;
+    
+    // Find the workspace being deleted
+    const workspaceToDelete = spaces.find(s => s.id === spaceId);
+    if (!workspaceToDelete) return;
+
     try {
+      // First, delete the workspace
       const res = await fetch(`/api/spaces/${spaceId}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${user.token}`,
         },
       });
+      
       if (!res.ok) throw new Error("Failed to delete space");
-      setLocalSpaces((prev) => prev.filter((s) => s.id !== spaceId));
-      toast.success("Workspace deleted successfully!");
+      
+      // Find the Personal Workspace
+      const personalWorkspace = spaces.find(s => 
+        s.name.trim().toLowerCase() === "personal workspace"
+      );
+      
+      if (personalWorkspace && workspaceToDelete.contents?.length) {
+        // Delete all contents of this workspace from the Personal Workspace
+        const deletePromises = workspaceToDelete.contents.map(content => 
+          fetch(`/api/contents/${content.id}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${user.token}` },
+          })
+        );
+        
+        await Promise.all(deletePromises);
+      }
+      
+      toast.success("Workspace and its contents deleted successfully!");
+      // Refresh spaces to get the latest state
+      await refreshSpaces(user.token, true);
     } catch (error) {
-      console.error(error);
-      toast.error("Failed to delete workspace");
+      console.error("Error deleting workspace:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to delete workspace");
     }
   };
 
-  // Find and pin the default workspace
-  const defaultWorkspace = localSpaces.find(
-    (space) => space.id === "default" || space.name.toLowerCase().includes("default")
-  );
-  const otherWorkspaces = localSpaces.filter(
-    (space) => !(space.id === "default" || space.name.toLowerCase().includes("default"))
-  );
-
-  // Helper to render a workspace card
-  const renderWorkspaceCard = (space: SpaceItem, isDefault = false) => (
-    <div
-      key={space.id}
-      className="group relative rounded-lg border p-6 hover:bg-accent transition-colors"
-    >
-      <div className="flex items-center justify-between">
-        <button
-          className="flex-1 text-left bg-transparent border-none outline-none cursor-pointer"
-          onClick={() => {
-            setShow(true);
-            router.push(`/dashboard/spaces/${space.id}`);
-          }}
-        >
-          <h3 className="font-semibold tracking-tight">
-            {isDefault ? "Personal Workspace" : space.name}
-          </h3>
-        </button>
-        {!isDefault && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem 
-                className="text-red-500"
-                onClick={() => handleDeleteSpace(space.id)}
-              >
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-      </div>
-    </div>
-  );
-
   return (
-    <div className="min-h-full dark:bg-gray-900">
-      <main className="container py-6">
-        <div className="flex flex-col space-y-8">
-          <section className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold tracking-tight" style={{color: '#5B4B8A'}}>My Workspace</h2>
-              <BackButton />
+    <div className="min-h-full">
+      <main className="container py-8 px-4 md:px-8">
+        <div className="flex justify-between items-start w-full mb-8">
+          <h2 className="text-4xl font-bold tracking-tight pt-4 text-[#5B4B8A] dark:text-white">
+            My Workspaces
+          </h2>
+          <BackButton onClick={() => router.push("/dashboard")} />
+        </div>
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {spaces.map((space) => (
+            <div className="group relative bg-card dark:bg-gray-800 rounded-xl border border-border p-6 hover:shadow-lg transition-all duration-200 hover:-translate-y-1 h-full flex flex-col">
+            <div className="flex justify-between items-start mb-2">
+              <Link
+                href={`/dashboard/workspaces/${space.id}`}
+                className="flex-1 min-w-0"
+              >
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white group-hover:text-[#5B4B8A] dark:group-hover:text-[#C7AFFF] transition-colors">
+                  {space.name}
+                </h3>
+              </Link>
+              {space.id !== "personal" && (
+                <div className="absolute top-2 right-2 z-10">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button 
+                        className="p-1 rounded-full hover:bg-[#E58C5A]/80 dark:hover:bg-[#E58C5A]/90 focus:outline-none"
+                        onClick={(e) => e.preventDefault()}
+                      >
+                        <MoreVertical className="h-5 w-5 text-black dark:text-white" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem 
+                        className="text-red-500 cursor-pointer" 
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          handleDeleteSpace(space.id);
+                        }}
+                      >
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )}
             </div>
-            <div className="grid gap-4 grid-cols-3">
-              {defaultWorkspace && renderWorkspaceCard(defaultWorkspace, true)}
-              {otherWorkspaces.slice(0, 3 - (defaultWorkspace ? 1 : 0)).map((space) => renderWorkspaceCard(space))}
-            </div>
-            {otherWorkspaces.length > 3 - (defaultWorkspace ? 1 : 0) && (
-              <div className="grid gap-4 grid-cols-3 mt-4">
-                {otherWorkspaces.slice(3 - (defaultWorkspace ? 1 : 0)).map((space) => renderWorkspaceCard(space))}
-              </div>
-            )}
-          </section>
+            <p className="text-sm text-gray-500 dark:text-gray-200 mt-auto">
+              {space.contents?.length || 0} items
+            </p>
+          </div>
+          ))}
+          <div className="flex items-center justify-center rounded-xl border-2 border-dashed border-gray-300 dark:border-white/50 p-6 hover:border-primary/30 dark:hover:border-white/70 transition-colors bg-[#fffefc] dark:bg-gray-800 hover:shadow-lg h-full">
+            <CreateSpaceDialog onCreateSpace={handleCreateSpace}>
+              <Button variant="ghost" className="h-auto p-4 w-full flex items-center justify-center gap-2 group hover:bg-transparent">
+                <PlusCircle className="h-4 w-4 text-muted-foreground dark:text-white/80 group-hover:text-primary/80 dark:group-hover:text-white transition-colors" />
+                <span className="text-sm font-medium dark:text-white/80 group-hover:text-primary/80 dark:group-hover:text-white transition-colors">New Workspace</span>
+              </Button>
+            </CreateSpaceDialog>
+          </div>
         </div>
       </main>
     </div>

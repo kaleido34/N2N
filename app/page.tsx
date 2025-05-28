@@ -72,7 +72,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#FAF7F8] dark:bg-[#18132A] transition-colors duration-300 scroll-smooth">
       {/* Hero Section with border */}
-      <section className="flex flex-col md:flex-row items-center justify-between max-w-7xl mx-auto px-8 py-16 md:py-24 gap-12 border-b border-[#23223a]">
+      <section className="flex flex-col md:flex-row items-center justify-between max-w-7xl mx-auto px-8 py-16 md:py-24 gap-12 border-b border-[#23223a] dark:border-white">
         {/* Left: Text */}
         <div className="flex-1 max-w-xl">
           <h1 className="text-4xl md:text-6xl font-extrabold text-dark5 dark:text-white leading-tight mb-6">

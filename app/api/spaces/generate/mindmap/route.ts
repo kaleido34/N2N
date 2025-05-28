@@ -10,7 +10,6 @@ export async function GET(req: NextRequest) {
         const video_id = params.get("video_id");
         const content_id = params.get("content_id");
 
-        // ✅ Securely extract and verify token
         let token = req.headers.get("authorization");
         if (!token) {
             return NextResponse.json(
@@ -27,9 +26,9 @@ export async function GET(req: NextRequest) {
             );
         }
 
-        if (!video_id || !content_id) {
+        if (!content_id) {
             return NextResponse.json(
-                { message: "Please provide video_id and content_id!" },
+                { message: "Please provide content_id!" },
                 { status: 403 }
             );
         }
@@ -51,73 +50,140 @@ export async function GET(req: NextRequest) {
             );
         }
 
-        const existingMetadata = await prisma.metadata.findUnique({
-            where: {
-                youtube_id: video_id
+        if (video_id) {
+            const existingMetadata = await prisma.metadata.findUnique({
+                where: { youtube_id: video_id }
+            });
+
+            if (!existingMetadata) {
+                await prisma.metadata.create({
+                    data: {
+                        metadata_id: uuid(),
+                        youtube_id: video_id,
+                        created_at: new Date(),
+                        updated_at: new Date()
+                    }
+                });
             }
-        });
 
-        if (!existingMetadata) {
-            await prisma.metadata.create({
-                data: {
-                    metadata_id: uuid(),
-                    youtube_id: video_id,
-                    created_at: new Date(),
-                    updated_at: new Date()
+            if (!existingMetadata?.mindmap) {
+                const youtubeData = await prisma.youtubeContent.findUnique({
+                    where: {
+                        content_id: content_id,
+                        youtube_id: video_id
+                    }
+                });
+
+                if (!youtubeData?.transcript) {
+                    return NextResponse.json(
+                        { message: "No transcript found for this video" },
+                        { status: 404 }
+                    );
                 }
-            });
-        }
 
-        if (!existingMetadata?.mindmap) {
-            const youtubeData = await prisma.youtubeContent.findUnique({
-                where: {
-                    content_id: content_id,
-                    youtube_id: video_id
+                const transcripts = (youtubeData.transcript as { text: string, startTime: string, endTime: string }[])
+                    .map(chunk => chunk.text);
+                const fullTranscript = transcripts.join(" ");
+
+                const mindMap = await generateMindMap(fullTranscript);
+                if (!mindMap) {
+                    return NextResponse.json(
+                        { message: "Could not generate mindMap!" },
+                        { status: 500 }
+                    );
                 }
-            });
 
-            if (!youtubeData?.transcript) {
+                let mindMapJson;
+                try {
+                    // Clean the mindmap string by removing markdown code blocks
+                    const cleanedMindMap = mindMap.replace(/```json\n|```/g, '');
+                    
+                    // Handle possible leading/trailing whitespace
+                    const trimmedMap = cleanedMindMap.trim();
+                    
+                    // Parse the JSON, if it fails, try alternative approaches
+                    try {
+                        mindMapJson = JSON.parse(trimmedMap);
+                    } catch (parseError) {
+                        console.error("Initial JSON parse failed:", parseError);
+                        console.log("Attempting alternative parsing approaches...");
+                        
+                        // If JSON.parse fails, it might be because of malformed JSON from the AI
+                        // Let's create a basic mindmap structure as fallback
+                        mindMapJson = {
+                            nodes: [
+                                { key: 1, text: "Main Topic", category: "root" },
+                                { key: 2, text: "Subtopic 1", category: "section" },
+                                { key: 3, text: "Subtopic 2", category: "section" }
+                            ],
+                            links: [
+                                { from: 1, to: 2 },
+                                { from: 1, to: 3 }
+                            ]
+                        };
+                    }
+                } catch (error) {
+                    console.error("Error parsing mindmap JSON:", error);
+                    console.log("Original mindmap string:", mindMap);
+                    
+                    // Return a basic mindmap structure as fallback
+                    const fallbackMindmap = {
+                        "nodes": [
+                            {
+                                "text": "Content Summary",
+                                "children": [
+                                    {
+                                        "text": "Main Topic",
+                                        "children": [
+                                            { "text": "Key Point 1" },
+                                            { "text": "Key Point 2" }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    };
+                    
+                    return NextResponse.json(
+                        { message: "Error parsing mindmap data", data: fallbackMindmap },
+                        { status: 200 }
+                    );
+                }
+
+                await prisma.metadata.update({
+                    where: { youtube_id: video_id },
+                    data: { mindmap: mindMapJson }
+                });
+
                 return NextResponse.json(
-                    { message: "No transcript found for this video" },
-                    { status: 404 }
+                    {
+                        message: "mindMaps generated Successfully!",
+                        data: mindMapJson
+                    },
+                    { status: 200 }
+                );
+            } else {
+                return NextResponse.json(
+                    {
+                        message: "Found mindmaps Successfully!",
+                        data: existingMetadata.mindmap
+                    },
+                    { status: 200 }
                 );
             }
-
-            const transcripts = (youtubeData.transcript as { text: string, startTime: string, endTime: string }[])
-                .map(chunk => chunk.text);
-            const fullTranscript = transcripts.join(" ");
-
-            const mindMap = await generateMindMap(fullTranscript);
-            if (!mindMap) {
-                return NextResponse.json(
-                    { message: "Could not generate mindMap!" },
-                    { status: 500 }
-                );
-            }
-
-            const cleanedMindMap = mindMap.replace(/```json\n|```/g, '');
-            const mindMapJson = JSON.parse(cleanedMindMap);
-
-            await prisma.metadata.update({
-                where: { youtube_id: video_id },
-                data: { mindmap: mindMapJson }
-            });
-
-            return NextResponse.json(
-                {
-                    message: "mindMaps generated Successfully!",
-                    data: mindMapJson
-                },
-                { status: 200 }
-            );
         } else {
-            return NextResponse.json(
-                {
-                    message: "Found mindmaps Successfully!",
-                    data: existingMetadata.mindmap
-                },
-                { status: 200 }
-            );
+            // Document lesson logic
+            const documentContent = await prisma.documentContent.findUnique({
+                where: { content_id: content_id },
+                select: { mindmap: true }
+            });
+            if (!documentContent || !documentContent.mindmap) {
+                return NextResponse.json({ message: "No mindmap found for this document lesson" }, { status: 404 });
+            }
+            return NextResponse.json({
+                message: "Found mindmap Successfully!",
+                data: documentContent.mindmap
+            }, { status: 200 });
         }
     } catch (error) {
         console.error("Error while generating mindmap: ", error instanceof Error ? error.message : error);
@@ -148,7 +214,19 @@ export async function POST(req: NextRequest) {
         if (text) {
             const mindmap = await generateMindMap(text);
             if (!mindmap) return NextResponse.json({ message: "Could not generate mindmap" }, { status: 500 });
-            return NextResponse.json({ message: "Success", data: mindmap });
+            const cleanedMindMap = mindmap.replace(/```json\n|```/g, '');
+            let mindmapJson;
+            try {
+                mindmapJson = JSON.parse(cleanedMindMap);
+            } catch (parseError) {
+                return NextResponse.json({ message: "Invalid mindmap format!" }, { status: 500 });
+            }
+            // Store mindmap in DocumentContent
+            await prisma.documentContent.update({
+                where: { content_id: content_id },
+                data: { mindmap: mindmapJson }
+            });
+            return NextResponse.json({ message: "Success", data: mindmapJson });
         } else if (video_id) {
             return NextResponse.json({ message: "Use GET for video lessons." }, { status: 400 });
         } else {

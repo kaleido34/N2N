@@ -24,7 +24,6 @@ export default function MindMapTab({
   mindmapData,
   mindmapLoading,
 }: MindMapTabProps) {
-  console.log('MindMapTab mounted', { value, activeMainTab });
   const { id } = useParams();
   const { spaces } = useSpaces();
   const { user } = useAuth();

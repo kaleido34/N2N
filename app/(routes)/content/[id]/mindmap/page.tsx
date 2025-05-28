@@ -39,23 +39,19 @@ export default function MindmapPage() {
   const [chatMessages, setChatMessages] = useState<{ role: string; content: string }[]>([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
 
-  // Debug log at the top
-  console.log('MindmapPage mount:', { token: user?.token, youtube_id, content_id, id });
-
   useEffect(() => {
     if (loading) return; // Wait for spaces to load
     for (const space of spaces) {
       const content = space.contents?.find(content => content.id === id);
       if (content) {
-        setYoutubeId(content.youtube_id);
-        setContentId(content.id);
+        setYoutubeId(content.youtube_id ?? "");
+        setContentId(content.id ?? "");
         break;
       }
     }
   }, [spaces, id, loading]);
 
   useEffect(() => {
-    console.log('MindmapPage effect:', { token: user?.token, youtube_id, content_id });
     const fetchMindMap = async () => {
       try {
         setIsLoading(true);
@@ -68,9 +64,8 @@ export default function MindmapPage() {
             }
           }
         );
-        if (response.data) {
-          setMindMapData(response.data.data);
-          console.log('Mindmap API data:', response.data.data);
+        if (response.data && (response.data as any).data) {
+          setMindMapData((response.data as any).data);
         }
       } catch (error) {
         setError("Failed to generate mindmap. Please try again.");
@@ -90,9 +85,9 @@ export default function MindmapPage() {
         const response = await axios.get(`/api/spaces/generate/summary?video_id=${youtube_id}&content_id=${content_id}`, {
           headers: { authorization: user?.token }
         });
-        if (response.data && response.data.data) {
+        if (response.data && (response.data as any).data) {
           // Assume summary is a string or array of paragraphs
-          const summaryData = response.data.data;
+          const summaryData = (response.data as any).data;
           setSummary(Array.isArray(summaryData) ? summaryData : summaryData.split('\n').filter(Boolean));
         }
       } catch (e) {
@@ -116,8 +111,8 @@ export default function MindmapPage() {
       }, {
         headers: { authorization: user?.token }
       });
-      if (response.data && response.data.data) {
-        setChatMessages((prev) => [...prev, { role: "assistant", content: response.data.data }]);
+      if (response.data && (response.data as any).data) {
+        setChatMessages((prev) => [...prev, { role: "assistant", content: (response.data as any).data }]);
       }
     } catch (e) {
       setChatMessages((prev) => [...prev, { role: "assistant", content: "Failed to get response from assistant." }]);
@@ -232,6 +227,7 @@ export default function MindmapPage() {
                 style={{ width: '100%', height: '800px', background: '#fff' }}
                 nodeDataArray={mindMapData.nodes}
                 linkDataArray={mindMapData.links}
+                divClassName="mindmap-diagram"
               />
             ) : null}
           </div>
@@ -239,4 +235,4 @@ export default function MindmapPage() {
       </div>
     </div>
   );
-} 
+}

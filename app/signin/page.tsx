@@ -1,3 +1,27 @@
+// "use client";
+
+// import { useEffect } from "react";
+// import { useRouter } from "next/navigation";
+
+// export default function SigninRedirect() {
+//   const router = useRouter();
+  
+//   // Redirect to the proper signin page
+//   useEffect(() => {
+//     router.replace("/auth/signin");
+//   }, [router]);
+  
+//   return (
+//     <div className="flex min-h-screen items-center justify-center">
+//       <div className="text-center">
+//         <h1 className="text-2xl font-bold mb-4">Redirecting...</h1>
+//         <p>Please wait while we redirect you to the signin page.</p>
+//       </div>
+//     </div>
+//   );
+// }
+
+
 "use client";
 
 import Link from "next/link";

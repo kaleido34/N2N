@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import useIsMobile from "@/hooks/useIsMobile";
-import { useRouter } from "next/navigation";
-import axios from "axios";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/auth-provider";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 import {
   ResizableHandle,
@@ -20,14 +19,9 @@ import RightPanel from "./RightPanel";
 import QuizTab from "./QuizTab";
 import FlashcardsTab from "./FlashcardsTab";
 import MindMapTab from "./MindMapTab";
-import { useLessonCache } from '@/hooks/useLessonCache';
 
-/**
- * (Optional) If you moved dummy data to "dummyData.ts",
- * import it here. Otherwise, keep them in this file as you originally had.
- */
+// Import dummy data for fallbacks
 import {
-  dummyChatMessages,
   dummyFlashcards,
   dummySummary,
   dummyTakeaways,
@@ -39,390 +33,452 @@ interface ContentPageProps {
   id: string; // from useParams
 }
 
-export default function ContentPage({ id }: ContentPageProps) {
-  const isMobile = useIsMobile();
-  const router = useRouter();
-  const { user } = useAuth();
-  const { getLessonData, setLessonData } = useLessonCache();
+interface LeftPanelProps {
+  id: string;
+  activeVideoTab: string;
+  setActiveVideoTab: (value: string) => void;
+}
 
-  const [activeMainTab, setActiveMainTab] = useState("chat");
-  const [activeVideoTab, setActiveVideoTab] = useState("transcript");
-  const [chatInput, setChatInput] = useState("");
+interface RightPanelProps {
+  activeMainTab: string;
+  setActiveMainTab: (value: string) => void;
+  
+  // Quiz
+  dummyQuiz: {
+    question: string;
+    options: string[];
+    correctAnswer: number;
+    explanation: string;
+  }[];
+  selectedAnswers: Record<number, number>;
+  handleAnswerSelect: (qIndex: number, oIndex: number) => void;
+
+  // Flashcards
+  dummyFlashcards: { front: string; back: string }[];
+  currentFlashcard: number;
+  setCurrentFlashcard: (val: number) => void;
+  isFlipped: boolean;
+  setIsFlipped: (val: boolean) => void;
+
+  // Summary
+  dummySummary: string[];
+  dummyTakeaways: string[];
+
+  // Mindmap
+  dummyMindMap: {
+    nodes: Array<{
+      key: number;
+      text: string;
+      category: 'root' | 'section' | 'topic';
+    }>;
+    links: Array<{
+      from: number;
+      to: number;
+    }>;
+  };
+}
+
+interface QuizTabProps {
+  value: string;
+  activeMainTab: string;
+  quizData: any;
+  quizLoading: boolean;
+}
+
+interface MindMapTabProps {
+  value: string;
+  activeMainTab: string;
+  mindmapData: {
+    nodes: Array<{
+      key: number;
+      text: string;
+      category: string;
+    }>;
+    links: Array<{
+      from: number;
+      to: number;
+    }>;
+  };
+  mindmapLoading: boolean;
+}
+
+interface FlashcardsTabProps {
+  value: string;
+  activeMainTab: string;
+  flashcardsData: any;
+  flashcardsLoading: boolean;
+}
+
+export default function ContentPage({ id }: ContentPageProps) {
+  const { user } = useAuth();
+  const [content, setContent] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('summary');
+  const [activeVideoTab, setActiveVideoTab] = useState('transcript');
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
   const [currentFlashcard, setCurrentFlashcard] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
-  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
-  const [summary, setSummary] = useState<string[]>([]);
-  const [chatMessages, setChatMessages] = useState<{ role: string; content: string }[]>([]);
-  const [isChatLoading, setIsChatLoading] = useState(false);
-  const [youtube_id, setYoutubeId] = useState<string>("");
-  const [content_id, setContentId] = useState<string>("");
-  const [audioChunks, setAudioChunks] = useState<string[]>([]);
-  const [audioLoading, setAudioLoading] = useState(false);
-  const [audioError, setAudioError] = useState<string | null>(null);
-  const [audioUrls, setAudioUrls] = useState<string[]>([]);
-  const [currentAudioIndex, setCurrentAudioIndex] = useState(0);
-  const audioRefs = useRef<(HTMLAudioElement | null)[]>([]);
-  const [contentType, setContentType] = useState<"YOUTUBE_CONTENT" | "DOCUMENT_CONTENT" | null>(null);
-  const [documentText, setDocumentText] = useState<string>("");
-  const [quizData, setQuizData] = useState<any>(null);
-  const [quizLoading, setQuizLoading] = useState(false);
-  const [flashcardsData, setFlashcardsData] = useState<any>(null);
-  const [flashcardsLoading, setFlashcardsLoading] = useState(false);
-  const [mindmapData, setMindmapData] = useState<any>(null);
-  const [mindmapLoading, setMindmapLoading] = useState(false);
+  const [dummyQuiz, setDummyQuiz] = useState<RightPanelProps['dummyQuiz']>([]);
+  const [dummyFlashcards, setDummyFlashcards] = useState<RightPanelProps['dummyFlashcards']>([]);
+  const [dummySummary, setDummySummary] = useState<RightPanelProps['dummySummary']>([]);
+  const [dummyTakeaways, setDummyTakeaways] = useState<RightPanelProps['dummyTakeaways']>([]);
+  const [dummyMindMap, setDummyMindMap] = useState<{
+    nodes: Array<{
+      key: number;
+      text: string;
+      category: string;
+    }>;
+    links: Array<{
+      from: number;
+      to: number;
+    }>;
+  }>({
+    nodes: [],
+    links: []
+  });
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string>("");
 
-  // On mount, try to load from cache
+  const handleAudioPlay = () => {
+    setIsPlaying(!isPlaying);
+  };
+
   useEffect(() => {
-    const cached = getLessonData(id);
-    if (cached) {
-      setQuizData(cached.quizData ?? null);
-      setFlashcardsData(cached.flashcardsData ?? null);
-      setMindmapData(cached.mindmapData ?? null);
-      setSummary(Array.isArray(cached.summary) ? cached.summary : []);
-      setQuizLoading(false);
-      setFlashcardsLoading(false);
-      setMindmapLoading(false);
+    if (user && user.token) {
+      fetchContent();
+      fetchMindmap();
+      fetchSummary();
     }
-  }, [id, getLessonData]);
+  }, [id, user]);
 
-  // Fetch content metadata and type ONCE per lesson
-  useEffect(() => {
-    const fetchContent = async () => {
-      try {
-        const res = await fetch(`/api/contents?id=${id}`);
-        if (!res.ok) throw new Error("Failed to fetch content details");
-        const data = await res.json();
-        setContentType(data.type);
-        setContentId(id);
-        if (data.type === "YOUTUBE_CONTENT") {
-          setYoutubeId(data.youtube_id);
-        } else if (data.type === "DOCUMENT_CONTENT") {
-          setDocumentText(data.text || "");
-        }
-      } catch (e) {
-        setYoutubeId("");
-        setContentId("");
-        setContentType(null);
-        setDocumentText("");
-      }
-    };
-    fetchContent();
-  }, [id]);
-
-  // Fetch all AI features ONCE per lesson, only if not cached
-  useEffect(() => {
-    const cached = getLessonData(id);
-    if (cached && cached.quizData && cached.flashcardsData && cached.mindmapData && cached.summary?.length > 0) {
-      // Already loaded from cache
-      return;
-    }
-    if (!contentType) return;
-    if (contentType === 'YOUTUBE_CONTENT' && youtube_id) {
-      setQuizLoading(true);
-      setFlashcardsLoading(true);
-      setMindmapLoading(true);
-      // Quiz
-      fetch(`/api/spaces/generate/quiz?video_id=${youtube_id}&content_id=${content_id}`, {
-        headers: { Authorization: user?.token ? `Bearer ${user.token}` : "" }
-      })
-        .then(res => res.json())
-        .then(data => {
-          setQuizData(data.data);
-          setLessonData(id, { quizData: data.data });
-        })
-        .finally(() => setQuizLoading(false));
-      // Flashcards
-      fetch(`/api/spaces/generate/flashcard?video_id=${youtube_id}&content_id=${content_id}`, {
-        headers: { Authorization: user?.token ? `Bearer ${user.token}` : "" }
-      })
-        .then(res => res.json())
-        .then(data => {
-          setFlashcardsData(data.data);
-          setLessonData(id, { flashcardsData: data.data });
-        })
-        .finally(() => setFlashcardsLoading(false));
-      // Mindmap
-      fetch(`/api/spaces/generate/mindmap?video_id=${youtube_id}&content_id=${content_id}`, {
-        headers: { Authorization: user?.token ? `Bearer ${user.token}` : "" }
-      })
-        .then(res => res.json())
-        .then(data => {
-          setMindmapData(data.data);
-          setLessonData(id, { mindmapData: data.data });
-        })
-        .finally(() => setMindmapLoading(false));
-      // Summary
-      fetch(`/api/spaces/generate/summary?video_id=${youtube_id}&content_id=${content_id}`, {
-        headers: { Authorization: user?.token ? `Bearer ${user.token}` : "" }
-      })
-        .then(res => res.json())
-        .then(data => {
-          const summaryData = data.data;
-          let summaryArr: string[] = [];
-          if (Array.isArray(summaryData)) {
-            summaryArr = summaryData;
-          } else if (typeof summaryData === 'string') {
-            summaryArr = summaryData.split('\n').filter(Boolean);
-          }
-          setSummary(summaryArr);
-          setLessonData(id, { summary: summaryArr });
-        });
-    } else if (contentType === 'DOCUMENT_CONTENT' && documentText) {
-      setQuizLoading(true);
-      setFlashcardsLoading(true);
-      setMindmapLoading(true);
-      // Quiz
-      fetch('/api/spaces/generate/quiz', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: user?.token ? `Bearer ${user.token}` : "" },
-        body: JSON.stringify({ text: documentText, content_id })
-      })
-        .then(res => res.json())
-        .then(data => {
-          setQuizData(data.data);
-          setLessonData(id, { quizData: data.data });
-        })
-        .finally(() => setQuizLoading(false));
-      // Flashcards
-      fetch('/api/spaces/generate/flashcard', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: user?.token ? `Bearer ${user.token}` : "" },
-        body: JSON.stringify({ text: documentText, content_id })
-      })
-        .then(res => res.json())
-        .then(data => {
-          setFlashcardsData(data.data);
-          setLessonData(id, { flashcardsData: data.data });
-        })
-        .finally(() => setFlashcardsLoading(false));
-      // Mindmap
-      fetch('/api/spaces/generate/mindmap', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: user?.token ? `Bearer ${user.token}` : "" },
-        body: JSON.stringify({ text: documentText, content_id })
-      })
-        .then(res => res.json())
-        .then(data => {
-          setMindmapData(data.data);
-          setLessonData(id, { mindmapData: data.data });
-        })
-        .finally(() => setMindmapLoading(false));
-      // Summary
-      fetch('/api/spaces/generate/summary', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: user?.token ? `Bearer ${user.token}` : "" },
-        body: JSON.stringify({ text: documentText, content_id })
-      })
-        .then(res => res.json())
-        .then(data => {
-          const summaryData = data.data;
-          let summaryArr: string[] = [];
-          if (Array.isArray(summaryData)) {
-            summaryArr = summaryData;
-          } else if (typeof summaryData === 'string') {
-            summaryArr = summaryData.split('\n').filter(Boolean);
-          }
-          setSummary(summaryArr);
-          setLessonData(id, { summary: summaryArr });
-        });
-    }
-  }, [contentType, youtube_id, documentText, content_id, user?.token, id, getLessonData, setLessonData]);
-
-  // Debug: Log the token before making API calls
-  useEffect(() => {
-    if (!user?.token) {
-      console.warn('No user token found!');
-    } else {
-      console.log('User token being sent:', user.token);
-    }
-  }, [user?.token]);
-
-  // Chat submit handler
-  const handleChatSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim()) return;
-    const newMessages = [...chatMessages, { role: 'user', content: chatInput }];
-    setChatMessages(newMessages);
-    setChatInput('');
-    setIsChatLoading(true);
+  const fetchContent = async () => {
     try {
-      const response: any = await axios.post(
-        `/api/spaces/generate/chat`,
-        contentType === "DOCUMENT_CONTENT"
-          ? { data: { text: documentText, content_id }, messages: newMessages }
-          : { data: { video_id: youtube_id }, messages: newMessages },
-        {
-          headers: { Authorization: user?.token ? `Bearer ${user.token}` : "" },
-        }
-      );
-      if (response.data && response.data.data) {
-        setChatMessages(prev => [...prev, { role: 'assistant', content: response.data.data }]);
+      setLoading(true);
+      console.log(`Fetching content for ID: ${id}`);
+      const res = await fetch(`/api/contents?id=${id}`, {
+        headers: {
+          Authorization: `Bearer ${user?.token}`,
+        },
+      });
+      
+      if (!res.ok) {
+        console.error(`Failed to fetch content: ${res.status} ${res.statusText}`);
+        setError("Failed to load content");
+        return;
       }
-    } catch (error) {
-      setChatMessages(prev => [...prev, { role: 'assistant', content: 'Failed to get response from assistant.' }]);
-      console.error('Error sending message:', error);
+      
+      const data = await res.json();
+      console.log("Content data:", data);
+      setContent(data);
+      
+      // Set quiz and flashcard data if available
+      setDummyQuiz(data?.quiz || dummyQuiz);
+      setDummyFlashcards(data?.flashcards || dummyFlashcards);
+      
+      // Set any takeaways if available
+      setDummyTakeaways(data?.takeaways || dummyTakeaways);
+      
+      // Set audio URL if available
+      if (data?.youtube_url) {
+        setAudioUrl(data.youtube_url);
+      }
+      
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching content:', err);
+      setError('Failed to load content');
     } finally {
-      setIsChatLoading(false);
+      setLoading(false);
     }
   };
 
-  const handleAnswerSelect = (questionIndex: number, answerIndex: number) => {
-    setSelectedAnswers((prev) => ({
+  // Fetch summary from the dedicated summary endpoint
+  const fetchSummary = async () => {
+    try {
+      if (!content?.youtube_id) return;
+      
+      console.log(`Fetching summary for content ID: ${id} and YouTube ID: ${content.youtube_id}`);
+      const res = await fetch(`/api/spaces/generate/summary?video_id=${content.youtube_id}&content_id=${id}`, {
+        headers: {
+          Authorization: `Bearer ${user?.token}`,
+        },
+      });
+      
+      if (!res.ok) {
+        console.error(`Failed to fetch summary: ${res.status} ${res.statusText}`);
+        // Fall back to default summary
+        setDummySummary([
+          "This lesson covers important concepts related to the topic.",
+          "Key points are discussed in detail with practical examples.",
+          "The content is designed to help you understand the subject better."
+        ]);
+        return;
+      }
+      
+      const response = await res.json();
+      console.log('Summary API response:', response);
+      
+      if (response.data) {
+        const summaryText = response.data;
+        // Split summary into paragraphs for better readability
+        const summaryParagraphs = typeof summaryText === 'string' 
+          ? summaryText.split(/\n+/).filter(paragraph => paragraph.trim().length > 0)
+          : [];
+        
+        setDummySummary(summaryParagraphs.length > 0 ? summaryParagraphs : [
+          "This lesson covers important concepts related to the topic.",
+          "Key points are discussed in detail with practical examples.",
+          "The content is designed to help you understand the subject better."
+        ]);
+      }
+    } catch (err) {
+      console.error('Error fetching summary:', err);
+      setDummySummary([
+        "This lesson covers important concepts related to the topic.",
+        "Key points are discussed in detail with practical examples.",
+        "The content is designed to help you understand the subject better."
+      ]);
+    }
+  };
+
+  const fetchMindmap = async () => {
+    try {
+      console.log(`Fetching mindmap for content ID: ${id}`);
+      const res = await fetch(`/api/spaces/generate/mindmap?content_id=${id}`, {
+        headers: {
+          Authorization: `Bearer ${user?.token}`,
+        },
+      });
+      
+      if (!res.ok) {
+        console.error(`Failed to fetch mindmap: ${res.status} ${res.statusText}`);
+        
+        // Use fallback mindmap data
+        setDummyMindMap(dummyMindMap);
+        return;
+      }
+      
+      try {
+        const response = await res.json();
+        console.log('Mindmap API response:', response);
+        const mindmapData = response.data;
+        
+        // Check if mindmapData has the correct structure
+        if (!mindmapData) {
+          throw new Error('No mindmap data found in the response');
+        }
+        
+        // Format the mindmap data to match the expected structure
+        const formattedMindmap = {
+          nodes: [],
+          links: []
+        };
+
+        // Add root node
+        if (mindmapData?.nodes?.[0]) {
+          formattedMindmap.nodes.push({
+            key: 1,
+            text: mindmapData.nodes[0].text,
+            category: "root"
+          });
+          
+          // Add children nodes and links
+          let currentKey = 2;
+          mindmapData.nodes[0].children?.forEach((child) => {
+            formattedMindmap.nodes.push({
+              key: currentKey,
+              text: child.text,
+              category: "section"
+            });
+            formattedMindmap.links.push({
+              from: 1,
+              to: currentKey
+            });
+            
+            // Add grandchildren nodes and links
+            const childKey = currentKey;
+            if (child.children && Array.isArray(child.children)) {
+              child.children.forEach((grandchild) => {
+                currentKey++;
+                formattedMindmap.nodes.push({
+                  key: currentKey,
+                  text: grandchild.text,
+                  category: "topic"
+                });
+                formattedMindmap.links.push({
+                  from: childKey,
+                  to: currentKey
+                });
+              });
+            }
+            currentKey++;
+          });
+        }
+
+        console.log("Formatted mindmap:", formattedMindmap);
+        setDummyMindMap(formattedMindmap);
+      } catch (parseError) {
+        console.error('Error processing mindmap data:', parseError);
+        
+        // Use fallback mindmap data
+        setDummyMindMap(dummyMindMap);
+      }
+    } catch (err) {
+      console.error('Error fetching mindmap:', err);
+      setDummyMindMap(dummyMindMap);
+    }
+  };
+
+  const handleAnswerSelect = (qIndex: number, oIndex: number) => {
+    setSelectedAnswers(prev => ({
       ...prev,
-      [questionIndex]: answerIndex,
+      [qIndex]: oIndex
     }));
   };
 
-  const chunkText = (text: string, chunkSize: number = 200) => {
-    const chunks = [];
-    let i = 0;
-    while (i < text.length) {
-      chunks.push(text.slice(i, i + chunkSize));
-      i += chunkSize;
-    }
-    return chunks;
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
   };
 
-  const getFirstNWordsFullSentence = (text: string, n: number = 100): string => {
-    const words = text.split(/\s+/);
-    if (words.length <= n) return text;
-    const firstN = words.slice(0, n).join(' ');
-    // Find the last sentence-ending punctuation in the first N words
-    const match = firstN.match(/([\s\S]*?[.!?])(?=[^.!?]*$)/);
-    if (match) {
-      return match[0];
-    }
-    return firstN;
-  };
-
-  const handleListenAudio = async () => {
-    setAudioLoading(true);
-    setAudioError(null);
-    setAudioUrls([]);
-    setCurrentAudioIndex(0);
-    try {
-      const text = summary.join(' ');
-      const trimmedText = getFirstNWordsFullSentence(text, 100);
-      const res = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: trimmedText }),
-      });
-      if (!res.ok) throw new Error('Failed to generate audio');
-      const blob = await res.blob();
-      setAudioUrls([URL.createObjectURL(blob)]);
-    } catch (e: any) {
-      setAudioError(e.message || 'Audio generation failed');
-    } finally {
-      setAudioLoading(false);
+  const renderTab = (value: string) => {
+    switch (value) {
+      case 'quiz':
+        return <QuizTab
+          value="quiz"
+          activeMainTab={activeTab}
+          quizData={dummyQuiz}
+          quizLoading={loading}
+        />;
+      case 'flashcards':
+        return <FlashcardsTab
+          value="flashcards"
+          activeMainTab={activeTab}
+          flashcardsData={dummyFlashcards}
+          flashcardsLoading={loading}
+        />;
+      case 'mindmap':
+        return <MindMapTab
+          value="mindmap"
+          activeMainTab={activeTab}
+          mindmapData={dummyMindMap}
+          mindmapLoading={loading}
+        />;
+      default:
+        return <div>Select a tab</div>;
     }
   };
 
-  const handleAudioEnded = () => {
-    if (currentAudioIndex < audioUrls.length - 1) {
-      setCurrentAudioIndex(currentAudioIndex + 1);
-      audioRefs.current[currentAudioIndex + 1]?.play();
-    }
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#E58C5A]" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <p className="text-red-500">{error}</p>
+        <Button
+          onClick={() => window.location.reload()}
+          className="mt-4 bg-[#E58C5A] hover:bg-[#e5a05a] text-white"
+        >
+          Try Again
+        </Button>
+      </div>
+    );
+  }
+
+  if (!content) {
+    return <div>Content not found</div>;
+  }
 
   return (
-    <div className="flex flex-row h-full min-h-screen bg-background">
-      {/* Left Section */}
-      <div className="w-full md:w-1/3 lg:w-1/4 flex flex-col items-center px-6 py-10 gap-6 border-r border-gray-200 dark:border-gray-800">
-        <LeftPanel id={id} activeVideoTab={activeVideoTab} setActiveVideoTab={setActiveVideoTab} />
-      </div>
-      {/* Right Section */}
-      <div className="flex-1 flex flex-col px-8 py-10 gap-8 overflow-y-auto">
-        {/* Top bar with title and back button */}
-        <div className="flex justify-between items-center mb-8 border-b border-gray-200 dark:border-gray-800 pb-4">
-          <h1 className="text-3xl font-bold tracking-tight" style={{color: '#5B4B8A'}}>
-            Overview
-          </h1>
-          <Button
-            variant="ghost"
-            className="text-[#7B5EA7] dark:text-[#C7AFFF] hover:bg-[#7B5EA7]/10"
-            onClick={() => router.push('/dashboard/spaces/99d8053b-3aaa-41b5-9475-aa7b5af10dcd')}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
-        </div>
-        {/* Overview Section */}
-        <div className="bg-white dark:bg-[#18132A] rounded-xl p-6 shadow mb-8">
-          {summary.length > 0 ? summary.map((para, idx) => (
-            <p key={idx} className="mb-3 text-gray-800 dark:text-gray-200 text-base leading-relaxed">{para}</p>
-          )) : <span className="text-gray-400">No summary available.</span>}
-          <div className="mt-4 flex flex-col gap-2">
-            <Button onClick={handleListenAudio} disabled={audioLoading || summary.length === 0} className="w-fit">
-              {audioLoading ? 'Generating Audio...' : 'Listen Audio'}
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="container mx-auto px-4 py-8">
+        {/* Back button */}
+        <div className="mb-8">
+          <Link href="/dashboard">
+            <Button variant="ghost" className="flex items-center gap-2 text-foreground dark:text-white hover:text-foreground/80 dark:hover:text-white/80">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Dashboard
             </Button>
-            {audioError && <span className="text-red-500 text-sm">{audioError}</span>}
-            {audioUrls.length > 0 && (
-              <div className="flex flex-col gap-1">
-                {audioUrls.map((url, idx) => (
-                  <audio
-                    key={idx}
-                    ref={el => { audioRefs.current[idx] = el; }}
-                    src={url}
-                    controls={idx === currentAudioIndex}
-                    autoPlay={idx === currentAudioIndex}
-                    onEnded={handleAudioEnded}
-                    style={{ display: idx === currentAudioIndex ? 'block' : 'none' }}
+          </Link>
+        </div>
+
+        {/* Content Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2" style={{color: '#5B4B8A'}}>
+            {content.title || 'Untitled Content'}
+          </h1>
+          <p className="text-sm text-gray-500">
+            {content.createdAt
+              ? new Date(content.createdAt).toLocaleDateString()
+              : ""}
+          </p>
+        </div>
+
+        {/* Content Display */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md">
+          <div className="p-4">
+            <div className="flex gap-4 mb-4">
+              <Button
+                variant={activeTab === 'summary' ? 'default' : 'outline'}
+                onClick={() => handleTabChange('summary')}
+              >
+                Summary
+              </Button>
+              <Button
+                variant={activeTab === 'quiz' ? 'default' : 'outline'}
+                onClick={() => handleTabChange('quiz')}
+              >
+                Quiz
+              </Button>
+              <Button
+                variant={activeTab === 'flashcards' ? 'default' : 'outline'}
+                onClick={() => handleTabChange('flashcards')}
+              >
+                Flashcards
+              </Button>
+              <Button
+                variant={activeTab === 'mindmap' ? 'default' : 'outline'}
+                onClick={() => handleTabChange('mindmap')}
+              >
+                Mindmap
+              </Button>
+            </div>
+            <div className="p-6">
+              {activeTab === 'summary' ? (
+                <div className="flex gap-4">
+                  <LeftPanel 
+                    id={id}
+                    activeVideoTab={activeVideoTab}
+                    setActiveVideoTab={setActiveVideoTab}
                   />
-                ))}
-              </div>
-            )}
+                  <RightPanel 
+                    activeMainTab={activeTab}
+                    setActiveMainTab={setActiveTab}
+                    dummyQuiz={dummyQuiz}
+                    selectedAnswers={selectedAnswers}
+                    handleAnswerSelect={handleAnswerSelect}
+                    dummyFlashcards={dummyFlashcards}
+                    currentFlashcard={currentFlashcard}
+                    setCurrentFlashcard={setCurrentFlashcard}
+                    isFlipped={isFlipped}
+                    setIsFlipped={setIsFlipped}
+                    dummySummary={dummySummary}
+                    dummyTakeaways={dummyTakeaways}
+                    dummyMindMap={dummyMindMap}
+                  />
+                </div>
+              ) : (
+                renderTab(activeTab)
+              )}
+            </div>
           </div>
         </div>
-        {/* Chat Section */}
-        <div className="bg-white dark:bg-[#18132A] rounded-xl p-6 shadow mb-8 flex flex-col" style={{ maxWidth: 800 }}>
-          <h3 className="text-xl font-semibold mb-4" style={{color: '#5B4B8A'}}>Chat</h3>
-          <div className="flex-1 overflow-y-auto mb-4 max-h-64">
-            {chatMessages.length > 0 ? chatMessages.map((msg, idx) => (
-              <div key={idx} className={`mb-2 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
-                <span className={`inline-block px-3 py-2 rounded-lg ${msg.role === 'user' ? 'bg-[#E8E3FF] text-[#5B4B8A]' : 'bg-[#F3F0FF] text-[#232323]'}`}>{msg.content}</span>
-              </div>
-            )) : <span className="text-gray-400">No chat messages yet.</span>}
-            {isChatLoading && <div className="text-[#5B4B8A]">Assistant is typing...</div>}
-          </div>
-          <form onSubmit={handleChatSubmit} className="flex gap-2 mt-auto">
-            <input
-              type="text"
-              value={chatInput}
-              onChange={e => setChatInput(e.target.value)}
-              className="flex-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#5B4B8A]"
-              placeholder="Type your message..."
-              disabled={isChatLoading}
-            />
-            <button type="submit" className="bg-[#5B4B8A] text-white px-4 py-2 rounded-lg font-semibold" disabled={isChatLoading}>Send</button>
-          </form>
-        </div>
-        <Tabs defaultValue="summary" className="flex flex-col flex-1 min-h-0">
-          <TabsContent value="quiz">
-            <QuizTab
-              value="quiz"
-              activeMainTab={activeMainTab}
-              quizData={quizData}
-              quizLoading={quizLoading}
-            />
-          </TabsContent>
-          <TabsContent value="flashcards">
-            <FlashcardsTab
-              value="flashcards"
-              activeMainTab={activeMainTab}
-              flashcardsData={flashcardsData}
-              flashcardsLoading={flashcardsLoading}
-            />
-          </TabsContent>
-          <TabsContent value="mindmap">
-            <MindMapTab
-              value="mindmap"
-              activeMainTab={activeMainTab}
-              mindmapData={mindmapData}
-              mindmapLoading={mindmapLoading}
-            />
-          </TabsContent>
-        </Tabs>
       </div>
     </div>
   );

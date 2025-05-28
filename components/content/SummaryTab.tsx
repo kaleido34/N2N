@@ -25,11 +25,10 @@ export default function SummaryTab({
   const [youtube_id, setYoutubeId] = useState<string>("");
   const [content_id, setContentId] = useState<string>("");
   const [summaryData, setSummaryData] = useState("");
-  const { user } = useAuth()
+  const { user } = useAuth();
 
+  // Effect 1: Set youtube_id and content_id from spaces/id
   useEffect(() => {
-    setIsLoading(true)
-    // Find the content across all spaces
     for (const space of spaces) {
       const content = space.contents?.find(content => content.id === id);
       if (content) {
@@ -38,31 +37,31 @@ export default function SummaryTab({
         break;
       }
     }
+  }, [spaces, id]);
 
-    if (youtube_id && content_id) {
-      async function fetchData() {
-        try {
-          const response = await axios.get(`/api/spaces/generate/summary?video_id=${youtube_id}&content_id=${content_id}`, {
-            headers: {
-              authorization: user?.token
-            }
-          });
-
-          if (response?.data) {
-            // @ts-expect-error response.data.data type is unknown
-            setSummaryData(response?.data?.data);
+  // Effect 2: Fetch summary when IDs are set
+  useEffect(() => {
+    if (!youtube_id || !content_id || !user?.token) return;
+    setIsLoading(true);
+    async function fetchData() {
+      try {
+        const response = await axios.get(`/api/spaces/generate/summary?video_id=${youtube_id}&content_id=${content_id}`, {
+          headers: {
+            authorization: user?.token
           }
-        } catch (error) {
-          console.log("error while getting summary: ", error);
-        } finally {
-          setIsLoading(false);
+        });
+        if (response?.data) {
+          // @ts-expect-error response.data.data type is unknown
+          setSummaryData(response?.data?.data);
         }
+      } catch (error) {
+        // REMOVE noisy debug logs
+      } finally {
+        setIsLoading(false);
       }
-
-      fetchData();
     }
-
-  }, [spaces, id, youtube_id, content_id, user?.token]);
+    fetchData();
+  }, [youtube_id, content_id, user?.token]);
 
   return (
     <TabsContent value={value} className="flex-1 min-h-0 overflow-hidden mt-4">

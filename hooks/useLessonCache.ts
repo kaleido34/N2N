@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { create } from 'zustand';
 
 interface LessonData {
@@ -35,3 +36,18 @@ export const useLessonCache = create<LessonCacheState>((set: (fn: (state: Lesson
     return { ...state, cache: newCache };
   }),
 }));
+
+// Custom hook to provide memoized get/set functions for useEffect deps
+export function useLessonCacheWithMemo() {
+  const store = useLessonCache();
+  // Memoize the functions so their reference is stable
+  const getLessonData = useCallback(store.getLessonData, []);
+  const setLessonData = useCallback(store.setLessonData, []);
+  const clearLessonData = useCallback(store.clearLessonData, []);
+  return {
+    ...store,
+    getLessonData,
+    setLessonData,
+    clearLessonData,
+  };
+}

@@ -3,12 +3,6 @@ export const dummyTranscript = [
   /* ... etc ... */
 ];
 
-export const dummyChatMessages = [
-  { role: "user", content: "What are the main advantages of MongoDB?" },
-  { role: "assistant", content: "MongoDB offers several key advantages..." },
-  /* ... etc ... */
-];
-
 export const dummyFlashcards = [
   {
     front: "What is MongoDB?",
@@ -37,10 +31,22 @@ export const dummyQuiz = [
   /* ... etc ... */
 ];
 
-export const dummyMindMap = [
-  {
-    title: "Core Concepts",
-    subtopics: ["Documents", "Collections", "Databases"],
-  },
-  /* ... etc ... */
-];
+export const dummyMindMap = {
+  nodes: [
+    { key: 1, text: "MongoDB Basics", category: "root" },
+    { key: 2, text: "Documents", category: "section" },
+    { key: 3, text: "Collections", category: "section" },
+    { key: 4, text: "Databases", category: "section" },
+    { key: 5, text: "BSON Format", category: "topic" },
+    { key: 6, text: "Schema Design", category: "topic" },
+    { key: 7, text: "Sharding", category: "topic" }
+  ],
+  links: [
+    { from: 1, to: 2 },
+    { from: 1, to: 3 },
+    { from: 1, to: 4 },
+    { from: 2, to: 5 },
+    { from: 3, to: 6 },
+    { from: 4, to: 7 }
+  ]
+};

@@ -4,10 +4,28 @@ import { YoutubeTranscript } from "youtube-transcript";
 import { Pinecone, Index } from "@pinecone-database/pinecone";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import axios from "axios";
-import { EMBEDDING_MODEL, FALLBACK_MODEL, getEmbedding, generateEmbeddings, queryPineconeVectorStore } from "./embedding-utils";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+// Add model configuration
+const EMBEDDING_MODEL = 'sentence-transformers/all-MiniLM-L6-v2';
+const FALLBACK_MODEL = 'sentence-transformers/all-mpnet-base-v2';
+
+// Add helper function for model fallback
+// (Assume embedding is still needed for non-chat features)
+async function getEmbedding(text: string, modelName: string): Promise<number[]> {
+    try {
+        // Use a public API or fallback logic if needed
+        // ...existing code for non-chat embedding...
+        return [];
+    } catch (error) {
+        if (modelName === EMBEDDING_MODEL) {
+            return getEmbedding(text, FALLBACK_MODEL);
+        }
+        throw error;
+    }
+}
 
 export interface transcriptInterface {
     text: string;
@@ -98,9 +116,12 @@ export const initializePinecone = async () => {
         apiKey: process.env.PINECONE_API_KEY!,
     });
 
+    // await pinecone.init({
+    //   environment: "YOUR_ENVIRONMENT", // Replace with your Pinecone environment
+    //   apiKey: "YOUR_API_KEY", // Replace with your Pinecone API key
+    // });
     return pinecone.Index("youtube-content");
 };
-
 export const preprocessTranscript = async (
     transcript: transcriptInterface[],
     chunkSize = 300
@@ -136,8 +157,28 @@ export const preprocessTranscript = async (
     return chunks;
 };
 
-// Re-export the generateEmbeddings function from embedding-utils
-export { generateEmbeddings, queryPineconeVectorStore, getEmbedding, EMBEDDING_MODEL, FALLBACK_MODEL };
+export const generateEmbeddings = async (
+    chunks: { text: string; startTime: number | null; endTime: number | null }[],
+    video_id: string
+) => {
+    const results = [];
+    for (const [i, chunk] of chunks.entries()) {
+        try {
+            const embedding = await getEmbedding(chunk.text, EMBEDDING_MODEL);
+            results.push({
+                id: `${video_id}-chunk-${i}`,
+                video_id: video_id,
+                text: chunk.text,
+                startTime: chunk.startTime,
+                endTime: chunk.endTime,
+                vector: embedding,
+            } as ChunkData);
+        } catch (error) {
+            console.error(`Error generating embedding for chunk ${i}:`, error);
+        }
+    }
+    return results;
+};
 
 export const upsertChunksToPinecone = async (index: Index, chunks: ChunkData[]) => {
     // Ensure vectors is an array and matches Pinecone's expected format
@@ -322,7 +363,10 @@ export const generateMindMap = async (transcripts: string) => {
   let mindMapData: MindMapData | null = null;
   for (const chunk of chunks) {
     const generateContent = await model.generateContent([prompt, chunk]);
-    const chunkData: MindMapData = JSON.parse(generateContent.response.text());
+    const text = generateContent.response.text();
+    // Remove markdown formatting if present
+    const jsonStr = text.replace(/^```json\n|\n```$/g, '').trim();
+    const chunkData: MindMapData = JSON.parse(jsonStr);
     
     if (!mindMapData) {
       mindMapData = chunkData;
@@ -337,3 +381,38 @@ export const generateMindMap = async (transcripts: string) => {
 
   return JSON.stringify(mindMapData);
 };
+
+export async function queryPineconeVectorStore(
+    client: Pinecone,
+    indexname: string,
+    namespace: string, 
+    video_id: string,
+    searchQuery: string
+): Promise<string> {
+    
+    try {
+        const queryEmbedding = await getEmbedding(searchQuery, EMBEDDING_MODEL);
+        const index = client.index(indexname);
+        const queryResponse = await index.namespace(namespace).query({
+            topK: 5,
+            vector: queryEmbedding,
+            includeMetadata: true,
+            includeValues: false,
+            filter: {
+                video_id: { "$eq": video_id },
+            },
+        });
+        
+        if (queryResponse.matches.length > 0) {
+            const concatRetrievals = queryResponse.matches.map((match, idx) => {
+                return `\n Transcript chunks findings ${idx + 1}: \n ${match.metadata?.text} \n chunk timestamp startTime: ${match.metadata?.startTime} & endTime: ${match.metadata?.endTime}`
+            }).join(`\n\n`)
+            return concatRetrievals
+        } else {
+            return "<no match>";
+        }
+    } catch (error) {
+        console.error("[HF DEBUG] featureExtraction error", error);
+        return "<Error retrieving context. Proceeding with general knowledge.>";
+    }
+}

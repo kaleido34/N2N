@@ -182,6 +182,34 @@ const DropdownMenuShortcut = ({
 };
 DropdownMenuShortcut.displayName = "DropdownMenuShortcut";
 
+// --- DropdownMenuIconButton: for consistent 3-dot menu style ---
+interface DropdownMenuIconButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  children: React.ReactNode;
+  className?: string;
+}
+
+export const DropdownMenuIconButton = React.forwardRef<
+  HTMLButtonElement,
+  DropdownMenuIconButtonProps
+>(({ children, className, ...props }, ref) => (
+  <button
+    ref={ref}
+    type="button"
+    className={cn(
+      "h-10 w-10 rounded-full flex items-center justify-center transition-colors focus-visible:ring-2 focus-visible:ring-[#E58C5A]",
+      // Default: transparent bg, muted icon
+      // On hover/focus: soft teal bg, orange icon
+      "bg-transparent text-muted-foreground hover:bg-[#DDF3F2] hover:text-[#E58C5A] focus:bg-[#DDF3F2] focus:text-[#E58C5A]",
+      className
+    )}
+    {...props}
+  >
+    {children}
+  </button>
+));
+DropdownMenuIconButton.displayName = "DropdownMenuIconButton";
+
 export {
   DropdownMenu,
   DropdownMenuTrigger,

@@ -1,5 +1,4 @@
 import { fetchTranscripts, preprocessTranscript, transcriptInterface, upsertChunksToPinecone, initializePinecone } from "@/lib/utils";
-import { generateEmbeddings } from "@/lib/embedding-utils";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma"
 import { v4 as uuid } from "uuid"
@@ -134,11 +133,6 @@ export async function POST(req: NextRequest) {
                     }
                 }
             });
-
-            // Vector processing
-            const pineconeIndex = await initializePinecone();
-            const embeddedChunks = await generateEmbeddings(processedTranscriptChunks, video_id);
-            await upsertChunksToPinecone(pineconeIndex, embeddedChunks);
         }
 
         return NextResponse.json({ 

@@ -28,14 +28,11 @@ export function CreateSpaceDialog({ onCreateSpace, children }: CreateSpaceDialog
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Submitting workspace:", workspaceName);
     if (!workspaceName.trim()) return;
 
     setIsLoading(true);
     try {
-      console.log("About to call onCreateSpace");
       await onCreateSpace(workspaceName);
-      console.log("onCreateSpace finished");
       setWorkspaceName("");
       setOpen(false);
       toast.success("Workspace created successfully!");
@@ -59,21 +56,21 @@ export function CreateSpaceDialog({ onCreateSpace, children }: CreateSpaceDialog
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Create new workspace</DialogTitle>
-          <DialogDescription>
-            Create a new workspace to organize your content. You can add videos,
-            documents, and more.
+            <DialogTitle className="text-foreground dark:text-white">Create Workspace</DialogTitle>
+          <DialogDescription className="dark:text-gray-300">
+            Create a new workspace to keep your videos, documents, and other content neatly organized.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="name">Workspace name</Label>
+              <Label htmlFor="name" className="dark:text-gray-300">Workspace name</Label>
               <Input
                 id="name"
                 value={workspaceName}
                 onChange={(e) => setWorkspaceName(e.target.value)}
                 placeholder="Enter workspace name"
+                className="dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder-gray-400"
                 disabled={isLoading}
               />
             </div>
