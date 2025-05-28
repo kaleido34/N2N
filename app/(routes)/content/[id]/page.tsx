@@ -7,7 +7,7 @@ export default function Page() {
   const { id } = useParams();
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900">
+    <div className="min-h-screen bg-[#FAF7F8] dark:bg-gray-900">
       <ContentPage id={id as string} />
     </div>
   );

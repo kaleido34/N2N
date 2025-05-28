@@ -80,7 +80,7 @@ export default function ContentPage({ id }: ContentPageProps) {
     <div className="flex min-h-screen w-full overflow-x-hidden">
       {/* Main Content */}
       <div className="flex-1">
-        <main className="py-5 px-6 md:px-8 max-w-6xl">
+        <main className="py-5 px-6 md:px-8 max-w-7xl pr-0">
           {content && (
             <>
               <LeftPanel 

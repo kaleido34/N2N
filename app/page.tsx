@@ -25,6 +25,8 @@ import {
   BookMarked,
   GraduationCap,
   Video,
+  Headphones,
+  Music,
 } from "lucide-react";
 import { useAuthStore } from "@/hooks/auth-provider";
 
@@ -86,36 +88,112 @@ export default function Home() {
             <Link href="/auth/signup" className="px-6 py-3 rounded-md bg-[#7B5EA7] text-white font-semibold text-lg shadow hover:bg-[#684b9e] transition-colors duration-200 text-center">Get Started Free</Link>
             <a href="#how-it-works" className="px-6 py-3 rounded-md border border-[#7B5EA7] text-[#7B5EA7] font-semibold text-lg bg-white hover:bg-[#f3eefe] transition-colors duration-200 text-center">See How It Works</a>
           </div>
-          <div className="flex items-center gap-2 mt-2">
-            {/* Social proof dots */}
-            <div className="flex gap-1">
-              <span className="w-6 h-6 rounded-full bg-[#E5735A] text-white flex items-center justify-center font-bold">1</span>
-              <span className="w-6 h-6 rounded-full bg-[#E5735A] text-white flex items-center justify-center font-bold">2</span>
-              <span className="w-6 h-6 rounded-full bg-[#E5735A] text-white flex items-center justify-center font-bold">3</span>
-              <span className="w-6 h-6 rounded-full bg-[#E5735A] text-white flex items-center justify-center font-bold">4</span>
+          <div className="flex items-center mt-4">
+            {/* Social proof dots - overlapping */}
+            <div className="flex relative">
+              <span className="w-8 h-8 rounded-full bg-gradient-to-r from-[#7B5EA7] to-[#9270C9] text-white flex items-center justify-center font-bold shadow-md relative z-40">1</span>
+              <span className="w-8 h-8 rounded-full bg-gradient-to-r from-[#9270C9] to-[#B682ED] text-white flex items-center justify-center font-bold shadow-md -ml-2 relative z-30">2</span>
+              <span className="w-8 h-8 rounded-full bg-gradient-to-r from-[#E5735A] to-[#E9A07D] text-white flex items-center justify-center font-bold shadow-md -ml-2 relative z-20">3</span>
+              <span className="w-8 h-8 rounded-full bg-gradient-to-r from-[#C55B47] to-[#E5735A] text-white flex items-center justify-center font-bold shadow-md -ml-2 relative z-10">4</span>
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#7B5EA7] text-white font-bold -ml-2 relative z-0 shadow-md">
+                <span className="text-xs">9+</span>
+              </div>
             </div>
-            <span className="ml-3 text-[#5B5B5B] dark:text-gray-200 text-sm">Join 10,000+ students & educators</span>
+            <span className="ml-3 text-[#5B5B5B] dark:text-gray-200 text-sm font-medium">Join 10,000+ students & educators</span>
           </div>
         </div>
         {/* Right: Illustration Placeholder */}
         <div className="flex-1 flex items-center justify-center">
-          <div className="w-[420px] h-[280px] bg-gradient-to-r from-[#7B5EA7] to-[#E5735A] rounded-3xl shadow-lg flex flex-col justify-between p-6">
-            <div className="flex-1 flex items-center justify-center">
-              <div className="w-16 h-16 bg-white bg-opacity-30 rounded-full flex items-center justify-center">
-                <div className="w-8 h-8 bg-white bg-opacity-60 rounded-full" />
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.5 }}
+            whileHover={{ scale: 1.05 }}
+            className="flex items-center justify-center"
+          >
+            <div className="w-[500px] h-[340px] bg-gradient-to-r from-[#7B5EA7] to-[#E5735A] rounded-3xl shadow-xl flex flex-col justify-between p-8 relative overflow-hidden">
+              {/* Glass card effect */}
+              <motion.div 
+                initial={{ opacity: 0.1 }}
+                animate={{ opacity: 0.2 }}
+                transition={{ duration: 2, repeat: Infinity, repeatType: "reverse" }}
+                className="absolute top-[-50px] right-[-50px] w-[180px] h-[180px] bg-white rounded-full blur-xl"
+              ></motion.div>
+              <motion.div 
+                initial={{ opacity: 0.1 }}
+                animate={{ opacity: 0.3 }}
+                transition={{ duration: 3, repeat: Infinity, repeatType: "reverse", delay: 0.5 }}
+                className="absolute bottom-[-30px] left-[-30px] w-[150px] h-[150px] bg-white rounded-full blur-lg"
+              ></motion.div>
+              
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="text-white font-bold text-2xl mb-2">AI Learning</h3>
+                  <p className="text-white text-opacity-90 text-sm">Transform content easily</p>
+                </div>
+                <motion.div 
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                  className="w-14 h-14 bg-white bg-opacity-30 rounded-full flex items-center justify-center">
+                  <div className="w-7 h-7 bg-white bg-opacity-60 rounded-full" />
+                </motion.div>
+              </div>
+              
+              <div className="my-6 space-y-4 relative">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: "66.666667%" }}
+                  transition={{ duration: 1, delay: 0.3 }}
+                  className="flex items-center">
+                  <div className="h-3 w-2/3 bg-[#C7E1C1] bg-opacity-90 rounded-full mr-2" />
+                  <span className="text-white text-opacity-80 text-xs">Concepts</span>
+                </motion.div>
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: "75%" }}
+                  transition={{ duration: 1, delay: 0.6 }}
+                  className="flex items-center">
+                  <div className="h-3 w-3/4 bg-[#C7E1C1] bg-opacity-90 rounded-full mr-2" />
+                  <span className="text-white text-opacity-80 text-xs">Ideas</span>
+                </motion.div>
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: "50%" }}
+                  transition={{ duration: 1, delay: 0.9 }}
+                  className="flex items-center">
+                  <div className="h-3 w-1/2 bg-[#C7E1C1] bg-opacity-90 rounded-full mr-2" />
+                  <span className="text-white text-opacity-80 text-xs">Details</span>
+                </motion.div>
+              </div>
+              
+              <div className="flex justify-between items-center mt-2 relative">
+                <motion.div 
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-4 py-2 rounded-md bg-[#C7E1C1] text-[#5B5B5B] font-semibold flex items-center gap-2 shadow-md cursor-pointer">
+                  <FileText className="h-4 w-4" />
+                  <span>Notes</span>
+                </motion.div>
+                <div className="flex items-center">
+                  <div className="h-[2px] w-12 bg-white"></div>
+                  <motion.div 
+                    animate={{ scale: [1, 1.2, 1] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                    className="bg-white bg-opacity-20 rounded-full p-1 mx-2">
+                    <Zap className="h-5 w-5 text-white" />
+                  </motion.div>
+                  <div className="h-[2px] w-12 bg-white"></div>
+                </div>
+                <motion.div 
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-4 py-2 rounded-md bg-[#E5735A] text-white font-semibold flex items-center gap-2 shadow-md cursor-pointer">
+                  <BookMarked className="h-4 w-4" />
+                  <span>Knowledge</span>
+                </motion.div>
               </div>
             </div>
-            <div className="mt-6 space-y-2">
-              <div className="h-3 w-3/4 bg-[#C7E1C1] rounded-full mb-1" />
-              <div className="h-3 w-2/3 bg-[#C7E1C1] rounded-full mb-1" />
-              <div className="h-3 w-5/6 bg-[#C7E1C1] rounded-full" />
-            </div>
-            <div className="flex justify-between items-center mt-6">
-              <span className="px-4 py-2 rounded-md bg-[#C7E1C1] text-[#5B5B5B] font-semibold">Notes</span>
-              <span className="text-2xl text-[#5B5B5B]">→</span>
-              <span className="px-4 py-2 rounded-md bg-[#E5735A] text-white font-semibold">Flashcards</span>
-            </div>
-          </div>
+          </motion.div>
         </div>
       </section>
 
@@ -131,14 +209,14 @@ export default function Home() {
             {[
               {
               icon: <Bot className="w-7 h-7" />,
-              title: "Chat with Your Content",
-              description: "Ask questions and get instant, AI-powered answers from your notes, lectures, or videos—like having a study buddy on demand.",
+              title: "Test Yourself",
+              description: "Challenge your knowledge with adaptive quizzes and assessments that identify your strengths and weaknesses for targeted improvement.",
               iconBg: "bg-gradient-to-br from-[#F3F0FF] to-[#E8E3FF] dark:from-[#2A2540] dark:to-[#1E1A2E]",
               },
               {
               icon: <BookOpen className="w-7 h-7" />,
-              title: "One-Click Summaries",
-              description: "Turn hours of material into bite-sized, easy-to-review summaries with a single click—save time, learn smarter.",
+              title: "Create Modules",
+              description: "Build comprehensive learning modules from your content with structured sections, quizzes, and interactive elements.",
               iconBg: "bg-gradient-to-br from-[#F8F3F4] to-[#F3E8E9] dark:from-[#2A2540] dark:to-[#1E1A2E]",
               },
               {
@@ -149,8 +227,8 @@ export default function Home() {
               },
               {
               icon: <BookMarked className="w-7 h-7" />,
-              title: "Instant Flashcards",
-              description: "Generate smart flashcards from any content for rapid, effective revision—no manual work needed.",
+              title: "Instant Knowledge",
+              description: "Generate smart knowledge cards from any content for rapid, effective revision—no manual work needed.",
               iconBg: "bg-gradient-to-br from-[#FFF6F3] to-[#FFE8E3] dark:from-[#2A2540] dark:to-[#1E1A2E]",
               },
               {
@@ -160,9 +238,9 @@ export default function Home() {
               iconBg: "bg-gradient-to-br from-[#FFF3F8] to-[#FFE8F3] dark:from-[#2A2540] dark:to-[#1E1A2E]",
               },
               {
-              icon: <Video className="w-7 h-7" />,
-              title: "Smart Video Navigation",
-              description: "Jump to the good stuff—AI chapters let you skip straight to the most important moments in any video.",
+              icon: <Headphones className="w-7 h-7" />,
+              title: "Listen Audio",
+              description: "Convert your learning materials to audio format for on-the-go studying with natural voice narration and key points highlighted.",
               iconBg: "bg-gradient-to-br from-[#F3F6FF] to-[#E8EBFF] dark:from-[#2A2540] dark:to-[#1E1A2E]",
               },
             ].map((feature, index) => (
@@ -253,23 +331,96 @@ export default function Home() {
           </div>
           {/* Right: Illustration Placeholder */}
           <div className="flex-1 flex items-center justify-center">
-            <div className="w-[420px] h-[280px] bg-gradient-to-r from-[#7B5EA7] to-[#E5735A] rounded-3xl shadow-lg flex flex-col justify-between p-6">
-              <div className="flex-1 flex items-center justify-center">
-                <div className="w-16 h-16 bg-white bg-opacity-30 rounded-full flex items-center justify-center">
-                  <div className="w-8 h-8 bg-white bg-opacity-60 rounded-full" />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.5 }}
+              whileHover={{ scale: 1.05 }}
+              className="flex items-center justify-center"
+            >
+              <div className="w-[500px] h-[340px] bg-gradient-to-r from-[#7B5EA7] to-[#E5735A] rounded-3xl shadow-xl flex flex-col justify-between p-8 relative overflow-hidden">
+                {/* Glass card effect */}
+                <motion.div 
+                  initial={{ opacity: 0.1 }}
+                  animate={{ opacity: 0.2 }}
+                  transition={{ duration: 2, repeat: Infinity, repeatType: "reverse" }}
+                  className="absolute top-[-50px] right-[-50px] w-[180px] h-[180px] bg-white rounded-full blur-xl"
+                ></motion.div>
+                <motion.div 
+                  initial={{ opacity: 0.1 }}
+                  animate={{ opacity: 0.3 }}
+                  transition={{ duration: 3, repeat: Infinity, repeatType: "reverse", delay: 0.5 }}
+                  className="absolute bottom-[-30px] left-[-30px] w-[150px] h-[150px] bg-white rounded-full blur-lg"
+                ></motion.div>
+                
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="text-white font-bold text-2xl mb-2">Smart AI</h3>
+                    <p className="text-white text-opacity-90 text-sm">Create study materials fast</p>
+                  </div>
+                  <motion.div 
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                    className="w-14 h-14 bg-white bg-opacity-30 rounded-full flex items-center justify-center">
+                    <div className="w-7 h-7 bg-white bg-opacity-60 rounded-full" />
+                  </motion.div>
+                </div>
+                
+                <div className="my-6 space-y-4 relative">
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: "66.666667%" }}
+                    transition={{ duration: 1, delay: 0.3 }}
+                    className="flex items-center">
+                    <div className="h-3 w-2/3 bg-[#C7E1C1] bg-opacity-90 rounded-full mr-2" />
+                    <span className="text-white text-opacity-80 text-xs">Personalize</span>
+                  </motion.div>
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: "75%" }}
+                    transition={{ duration: 1, delay: 0.6 }}
+                    className="flex items-center">
+                    <div className="h-3 w-3/4 bg-[#C7E1C1] bg-opacity-90 rounded-full mr-2" />
+                    <span className="text-white text-opacity-80 text-xs">Generate</span>
+                  </motion.div>
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: "50%" }}
+                    transition={{ duration: 1, delay: 0.9 }}
+                    className="flex items-center">
+                    <div className="h-3 w-1/2 bg-[#C7E1C1] bg-opacity-90 rounded-full mr-2" />
+                    <span className="text-white text-opacity-80 text-xs">Learn</span>
+                  </motion.div>
+                </div>
+                
+                <div className="flex justify-between items-center mt-2 relative">
+                  <motion.div 
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="px-4 py-2 rounded-md bg-[#C7E1C1] text-[#5B5B5B] font-semibold flex items-center gap-2 shadow-md cursor-pointer">
+                    <FileText className="h-4 w-4" />
+                    <span>Notes</span>
+                  </motion.div>
+                  <div className="flex items-center">
+                    <div className="h-[2px] w-12 bg-white"></div>
+                    <motion.div 
+                      animate={{ scale: [1, 1.2, 1] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                      className="bg-white bg-opacity-20 rounded-full p-1 mx-2">
+                      <Zap className="h-5 w-5 text-white" />
+                    </motion.div>
+                    <div className="h-[2px] w-12 bg-white"></div>
+                  </div>
+                  <motion.div 
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="px-4 py-2 rounded-md bg-[#E5735A] text-white font-semibold flex items-center gap-2 shadow-md cursor-pointer">
+                    <BookMarked className="h-4 w-4" />
+                    <span>Knowledge</span>
+                  </motion.div>
                 </div>
               </div>
-              <div className="mt-6 space-y-2">
-                <div className="h-3 w-3/4 bg-[#C7E1C1] rounded-full mb-1" />
-                <div className="h-3 w-2/3 bg-[#C7E1C1] rounded-full mb-1" />
-                <div className="h-3 w-5/6 bg-[#C7E1C1] rounded-full" />
-              </div>
-              <div className="flex justify-between items-center mt-6">
-                <span className="px-4 py-2 rounded-md bg-[#C7E1C1] text-[#5B5B5B] font-semibold">Notes</span>
-                <span className="text-2xl text-[#5B5B5B]">→</span>
-                <span className="px-4 py-2 rounded-md bg-[#E5735A] text-white font-semibold">Flashcards</span>
-              </div>
-            </div>
+            </motion.div>
           </div>
         </div>
       </section>

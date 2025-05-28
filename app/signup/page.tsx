@@ -138,18 +138,7 @@ export default function SignUp() {
                   onChange={handleChange}
                   className="pl-10 pr-10 h-12 rounded-lg border border-gray-200 dark:border-[#2A2540] focus:border-[#7B5EA7] focus:ring-2 focus:ring-[#7B5EA7] bg-white dark:bg-[#23223A] text-[#232323] dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#C7AFFF]"
                 />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-gray-400 dark:text-[#C7AFFF]" />
-                  ) : (
-                    <Eye className="h-5 w-5 text-gray-400 dark:text-[#C7AFFF]" />
-                  )}
-                </Button>
+                {/* Custom eye icon removed to fix duplication */}
               </div>
             </div>
             <Button type="submit" className="w-full h-12 rounded-md bg-[#7B5EA7] hover:bg-[#684b9e] text-white font-bold text-lg shadow transition-all duration-200" disabled={loading}>

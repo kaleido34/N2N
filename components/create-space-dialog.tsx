@@ -56,7 +56,7 @@ export function CreateSpaceDialog({ onCreateSpace, children }: CreateSpaceDialog
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-            <DialogTitle className="text-foreground dark:text-white">Create Workspace</DialogTitle>
+            <DialogTitle className="text-[#5B4B8A] dark:text-[#C7AFFF]">Create Workspace</DialogTitle>
           <DialogDescription className="dark:text-gray-300">
             Create a new workspace to keep your videos, documents, and other content neatly organized.
           </DialogDescription>

@@ -4,7 +4,7 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { CustomThemeToggle } from "@/components/mode-toggle";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ArrowRight, Plus, FolderOpen, Sparkles, BookOpen, Briefcase, MoreVertical, Settings, LogOut } from "lucide-react";
+import { ArrowRight, Plus, FolderOpen, Sparkles, BookOpen, Briefcase, MoreVertical, Settings, LogOut, ListTodo, FileText, BrainCircuit, Gamepad2, Headphones } from "lucide-react";
 import { useAuth } from "@/hooks/auth-provider";
 import { useRouter } from "next/navigation";
 import {
@@ -105,9 +105,9 @@ export default function DashboardSidebar({ minimized, setMinimized }: { minimize
   console.log('DashboardSidebar render', { minimized });
 
   return (
-    <aside className={`flex flex-col h-screen bg-white/80 dark:bg-[#11001C] border-r border-sidebar-border transition-all duration-300 z-50 ${minimized ? 'w-16' : 'w-64'} relative ${!minimized ? 'pl-3' : ''}`}> 
+    <aside className={`flex flex-col h-screen bg-[#FAF7F8] dark:bg-[#11001C] border-r border-sidebar-border transition-all duration-300 z-50 ${minimized ? 'w-16' : 'w-64'} relative ${!minimized ? 'pl-3' : ''}`}> 
       {/* Header */}
-      <div className={`flex items-center justify-between px-3 pt-5 pb-5 border-b border-sidebar-border bg-white/80 dark:bg-[#11001C] ${minimized ? '' : ''}`}>
+      <div className={`flex items-center justify-between px-3 pt-5 pb-5 border-b border-sidebar-border bg-[#FAF7F8] dark:bg-[#11001C] ${minimized ? '' : ''}`}>
         {!minimized && (
           <Link href="/" className="flex items-center gap-2 group">
             <Image src="/logo.png" alt="Logo" width={40} height={40} className="rounded-lg shadow-sm transition-transform duration-200 group-hover:scale-110" />
@@ -149,21 +149,21 @@ export default function DashboardSidebar({ minimized, setMinimized }: { minimize
         {/* New Lesson Button */}
         {minimized ? (
           <button
-            className="flex items-center justify-center h-9 w-9 mx-auto rounded-lg bg-gradient-to-br from-[#7B5EA7]/20 to-[#E58C5A]/20 hover:from-[#7B5EA7]/40 hover:to-[#E58C5A]/40 focus:outline-none focus:ring-2 focus:ring-[#7B5EA7] transition-colors"
+            className="flex items-center justify-center h-9 w-9 mx-auto rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 hover:bg-[#E58C5A]/80 focus:outline-none focus:ring-2 focus:ring-amber-400 transition-colors"
             onClick={() => router.push('/dashboard')}
             aria-label="New Lesson"
             type="button"
           >
-            <BookOpen className="h-5 w-5 text-[#7B5EA7] dark:text-[#C7AFFF]" />
+            <ListTodo className="h-5 w-5 text-white" />
           </button>
         ) : (
           <Button 
-            className="w-full justify-start pl-2 pr-6 font-semibold bg-transparent hover:bg-[#f3f0ff] dark:hover:bg-[#FFA07A]/40 text-[#232323] dark:text-white shadow-none rounded-lg my-1 transition-colors group"
+            className="w-full justify-start pl-2 pr-6 font-semibold bg-transparent hover:bg-[#E58C5A]/20 dark:hover:bg-[#E58C5A]/30 text-[#232323] dark:text-white shadow-none rounded-lg my-1 transition-colors group"
             onClick={() => router.push('/dashboard')}
           >
-            <span className="inline-flex items-center justify-center h-9 w-9 rounded-lg bg-gradient-to-br from-[#7B5EA7]/20 to-[#E58C5A]/20 group-hover:from-[#7B5EA7]/40 group-hover:to-[#E58C5A]/40 dark:group-hover:bg-[#E58C5A]/40 mr-3 transition-colors">
-              <BookOpen className="h-6 w-6 text-[#7B5EA7] dark:text-[#C7AFFF]" />
-            </span>
+            <div className="inline-flex items-center justify-center h-9 w-9 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 mr-3 transition-colors">
+              <ListTodo className="h-5 w-5 text-white" />
+            </div>
             New Lesson
           </Button>
         )}
@@ -171,21 +171,21 @@ export default function DashboardSidebar({ minimized, setMinimized }: { minimize
         {/* Visit Workspace Button */}
         {minimized ? (
           <button
-            className="flex items-center justify-center h-9 w-9 mx-auto rounded-lg bg-[#F3F0FF] dark:bg-[#23223A] hover:bg-[#7B5EA7]/20 dark:hover:bg-[#E58C5A]/20 focus:outline-none focus:ring-2 focus:ring-[#7B5EA7] transition-colors"
+            className="flex items-center justify-center h-9 w-9 mx-auto rounded-lg bg-gradient-to-br from-blue-400 to-indigo-500 hover:bg-[#E58C5A]/80 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors"
             onClick={() => router.push('/dashboard/workspaces')}
             aria-label="Visit Workspaces"
             type="button"
           >
-            <FolderOpen className="h-5 w-5 text-[#7B5EA7] dark:text-[#C7AFFF]" />
+            <FileText className="h-5 w-5 text-white" />
           </button>
         ) : (
           <Button
-            className="w-full justify-start pl-2 pr-6 font-semibold bg-transparent hover:bg-[#f3f0ff] dark:hover:bg-[#FFA07A]/40 text-[#232323] dark:text-white shadow-none rounded-lg my-1 transition-colors group"
+            className="w-full justify-start pl-2 pr-6 font-semibold bg-transparent hover:bg-[#E58C5A]/20 dark:hover:bg-[#E58C5A]/30 text-[#232323] dark:text-white shadow-none rounded-lg my-1 transition-colors group"
             onClick={() => router.push('/dashboard/workspaces')}
           >
-            <span className="inline-flex items-center justify-center h-9 w-9 rounded-lg bg-[#F3F0FF] dark:bg-[#23223A] group-hover:bg-[#f3f0ff] dark:group-hover:bg-[#FFA07A]/40 mr-3 transition-colors">
-              <FolderOpen className="h-6 w-6 text-[#7B5EA7] dark:text-[#C7AFFF]" />
-            </span>
+            <div className="inline-flex items-center justify-center h-9 w-9 rounded-lg bg-gradient-to-br from-blue-400 to-indigo-500 mr-3 transition-colors">
+              <FileText className="h-5 w-5 text-white" />
+            </div>
             Visit Workspaces
           </Button>
         )}
@@ -194,19 +194,19 @@ export default function DashboardSidebar({ minimized, setMinimized }: { minimize
         {minimized ? (
           <CreateSpaceDialog onCreateSpace={handleCreateSpace}>
             <button
-              className="flex items-center justify-center h-9 w-9 mx-auto rounded-lg bg-[#FFF6ED] dark:bg-[#2A1A13] hover:bg-[#E58C5A]/20 dark:hover:bg-[#E58C5A]/40 focus:outline-none focus:ring-2 focus:ring-[#E58C5A] transition-colors"
+              className="flex items-center justify-center h-9 w-9 mx-auto rounded-lg bg-gradient-to-br from-purple-400 to-[#7B5EA7] hover:bg-[#E58C5A]/80 focus:outline-none focus:ring-2 focus:ring-purple-400 transition-colors"
               aria-label="Create Workspace"
               type="button"
             >
-              <Plus className="h-5 w-5 text-[#E58C5A] dark:text-[#E58C5A]" />
+              <Plus className="h-5 w-5 text-white" />
             </button>
           </CreateSpaceDialog>
         ) : (
           <CreateSpaceDialog onCreateSpace={handleCreateSpace}>
-            <Button className="w-full justify-start pl-2 pr-6 font-semibold bg-transparent hover:bg-[#f3f0ff] dark:hover:bg-[#E58C5A]/30 text-[#232323] dark:text-white shadow-none rounded-lg my-1 transition-colors group">
-              <span className="inline-flex items-center justify-center h-9 w-9 rounded-lg bg-[#FFF6ED] dark:bg-[#2A1A13] group-hover:bg-[#f3f0ff] dark:group-hover:bg-[#E58C5A]/40 mr-3 transition-colors">
-                <Plus className="h-6 w-6 text-[#E58C5A] dark:text-[#E58C5A]" />
-              </span>
+            <Button className="w-full justify-start pl-2 pr-6 font-semibold bg-transparent hover:bg-[#E58C5A]/20 dark:hover:bg-[#E58C5A]/30 text-[#232323] dark:text-white shadow-none rounded-lg my-1 transition-colors group">
+              <div className="inline-flex items-center justify-center h-9 w-9 rounded-lg bg-gradient-to-br from-purple-400 to-[#7B5EA7] mr-3 transition-colors">
+                <Plus className="h-5 w-5 text-white" />
+              </div>
               Create Workspace
             </Button>
           </CreateSpaceDialog>
@@ -249,7 +249,7 @@ export default function DashboardSidebar({ minimized, setMinimized }: { minimize
       </div>
 
       {/* Footer (absolute bottom) */}
-      <div className="w-full flex items-center justify-between px-4 py-3 border-t border-sidebar-border bg-white/80 dark:bg-[#18132A]/80 absolute bottom-0 left-0">
+      <div className="w-full flex items-center justify-between px-4 py-3 border-t border-sidebar-border bg-[#FAF7F8] dark:bg-[#18132A]/80 absolute bottom-0 left-0">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Avatar className="h-9 w-9 cursor-pointer shadow-sm hover:shadow-md transition-all duration-200">

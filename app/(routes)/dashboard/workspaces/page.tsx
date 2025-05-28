@@ -228,7 +228,7 @@ export default function SpacesPage() {
   };
 
   return (
-    <div className="min-h-full">
+    <div className="min-h-full bg-[#FAF7F8] dark:bg-gray-900">
       <main className="container py-8 px-4 md:px-8">
         <div className="flex justify-between items-start w-full mb-8">
           <h2 className="text-4xl font-bold tracking-tight pt-4 text-[#5B4B8A] dark:text-white">

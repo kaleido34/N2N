@@ -34,7 +34,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="relative min-h-screen w-full bg-transparent">
+    <main className="relative min-h-screen w-full bg-[#FAF7F8] dark:bg-gray-900">
       <BackButton onClick={() => router.push("/")} className="absolute top-8 right-8" />
       <div className="flex flex-col items-center justify-center min-h-screen w-full">
         <h1 className="text-7xl font-extrabold text-center mb-10 text-[#5B4B8A] dark:text-white leading-none whitespace-nowrap">
