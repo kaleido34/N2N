@@ -24,8 +24,8 @@ export default function LeftPanel({
   return (
     <div className="space-y-6">
       {/* Header with Back Button */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-4xl font-bold tracking-tight text-[#5B4B8A] dark:text-white">Overview</h1>
+      <div className="flex items-center justify-between mb-6 mt-4 pl-4">
+        <h1 className="text-4xl font-bold tracking-tight text-[#5B4B8A] dark:text-white pl-4">Overview</h1>
         <Button 
           onClick={handleBack}
           variant="ghost" 
@@ -39,6 +39,7 @@ export default function LeftPanel({
       {/* Summary Section */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
         <div className="p-6">
+          <h2 className="text-xl font-semibold mb-4 text-[#5B4B8A] dark:text-white">{title}</h2>
           <div className="prose dark:prose-invert max-w-none">
             {summary && summary.length > 0 ? (
               <div className="space-y-4">

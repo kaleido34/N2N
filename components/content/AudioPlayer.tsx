@@ -9,9 +9,15 @@ interface AudioPlayerProps {
   isVisible: boolean;
   onClose: () => void;
   title?: string;
+  audioData?: {
+    audioUrl: string;
+  };
+  audioLoading?: boolean;
+  contentId?: string;
+  youtubeId?: string;
 }
 
-export function AudioPlayer({ isVisible, onClose, title = "Lecture Audio" }: AudioPlayerProps) {
+export function AudioPlayer({ isVisible, onClose, title = "Lecture Audio", audioData, audioLoading, contentId, youtubeId }: AudioPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -21,8 +27,8 @@ export function AudioPlayer({ isVisible, onClose, title = "Lecture Audio" }: Aud
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationRef = useRef<number | undefined>(undefined);
 
-  // Sample audio URL - replace with actual content audio
-  const audioUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3";
+  // Use real audio URL if available, otherwise fallback to sample
+  const audioUrl = audioData?.audioUrl || "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3";
 
   useEffect(() => {
     if (audioRef.current) {
@@ -40,23 +46,23 @@ export function AudioPlayer({ isVisible, onClose, title = "Lecture Audio" }: Aud
     const audio = audioRef.current;
     if (!audio) return;
 
-    const setAudioData = () => {
+    const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+    };
+
+    const handleLoadedMetadata = () => {
       setDuration(audio.duration);
       setCurrentTime(audio.currentTime);
     };
 
-    const setAudioTime = () => {
-      setCurrentTime(audio.currentTime);
-    };
-
     // Events
-    audio.addEventListener('loadeddata', setAudioData);
-    audio.addEventListener('timeupdate', setAudioTime);
+    audio.addEventListener('loadeddata', handleLoadedMetadata);
+    audio.addEventListener('timeupdate', handleTimeUpdate);
 
     // Cleanup
     return () => {
-      audio.removeEventListener('loadeddata', setAudioData);
-      audio.removeEventListener('timeupdate', setAudioTime);
+      audio.removeEventListener('loadeddata', handleLoadedMetadata);
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
     };
   }, []);
 
@@ -128,6 +134,14 @@ export function AudioPlayer({ isVisible, onClose, title = "Lecture Audio" }: Aud
   };
 
   if (!isVisible) return null;
+  
+  if (audioLoading) {
+    return (
+      <div className="fixed bottom-4 left-20 w-[calc(100vw-450px)] bg-[#FAF7F8] dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-3 shadow-lg z-50 rounded-lg flex justify-center items-center" style={{height: '80px'}}>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#5B4B8A]"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed bottom-4 left-20 w-[calc(100vw-450px)] bg-[#FAF7F8] dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-3 shadow-lg z-50 rounded-lg">

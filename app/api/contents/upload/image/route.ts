@@ -9,17 +9,21 @@ export const config = {
   },
 };
 
-async function extractTextFromPDFWithPython(file: Blob): Promise<string> {
+async function extractTextFromImageWithPython(file: Blob): Promise<{ image_id: string, text: string, transcript: any }> {
   const formData = new FormData();
   formData.append("file", file);
   // Call the Python extractor server
-  const res = await fetch("http://localhost:5005/extract/pdf", {
+  const res = await fetch("http://localhost:5005/extract/image", {
     method: "POST",
     body: formData,
   });
-  if (!res.ok) throw new Error("Failed to extract PDF text via Python server");
+  if (!res.ok) throw new Error("Failed to extract image text via Python server");
   const data = await res.json();
-  return data.text || "";
+  return {
+    image_id: data.image_id,
+    text: data.text || "",
+    transcript: data.transcript
+  };
 }
 
 export async function POST(req: NextRequest) {
@@ -28,6 +32,8 @@ export async function POST(req: NextRequest) {
   const file = formData.get("file");
   const userId = formData.get("userId");
   const spaceId = formData.get("spaceId");
+  const title = formData.get("title") || "Unnamed Image";
+  const description = formData.get("description") || "";
 
   if (!file || !(file instanceof Blob)) {
     return new Response("No file uploaded", { status: 400 });
@@ -56,24 +62,18 @@ export async function POST(req: NextRequest) {
     finalSpaceId = defaultSpace.space_id;
   }
 
-  // Extract text from PDF using Python server
-  let pdfData;
+  // Extract text from image using Python server
+  let imageData;
   try {
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await fetch("http://localhost:5005/extract/pdf", {
-      method: "POST",
-      body: formData,
-    });
-    if (!res.ok) throw new Error("Failed to extract PDF text via Python server");
-    pdfData = await res.json();
+    imageData = await extractTextFromImageWithPython(file);
   } catch (err) {
-    return new Response("Failed to extract PDF text", { status: 500 });
+    console.error("Failed to extract image text:", err);
+    return new Response("Failed to extract image text", { status: 500 });
   }
 
-  const { doc_id, text, transcript: pdfTranscript } = pdfData;
+  const { image_id, text, transcript } = imageData;
 
-  // --- Split text into transcript-like segments ---
+  // Convert text to transcript-like format for AI processing
   function splitTextToTranscript(text: string, segmentWordCount = 60): transcriptInterface[] {
     const sentences = text.match(/[^.!?\n]+[.!?\n]+/g) || [text];
     let transcript: transcriptInterface[] = [];
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
       if (wordCount >= segmentWordCount) {
         transcript.push({
           text: buffer,
-          duration: 0, // Not available for docs
+          duration: 0, // Not available for images
           offset: idx,
           lang: "en",
         });
@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
   const transcriptArr = splitTextToTranscript(text);
   const transcriptText = transcriptArr.map(t => t.text).join(" ");
 
-  // --- Generate AI features ---
+  // Generate AI features
   let quiz = null, flashcards = null, mindmap = null, summary = null;
   try {
     [quiz, flashcards, mindmap, summary] = await Promise.all([
@@ -122,19 +122,21 @@ export async function POST(req: NextRequest) {
 
   // Create new content/lesson in DB
   const contentId = uuid();
-  const filename = (file as File).name || "uploaded.pdf";
+  const filename = (file as File).name || "image.jpg";
+  const imageUrl = ""; // In a real app, you'd upload to S3 and get URL
+
+  // Create content with imageContent
   await prisma.content.create({
     data: {
       content_id: contentId,
-      content_type: "DOCUMENT_CONTENT",
-      documentContent: {
+      content_type: "IMAGE_CONTENT",
+      imageContent: {
         create: {
-          filename: filename,
-          file_url: "", // (optional: upload to S3 or similar)
-          doc_id: doc_id, // Use the ID from the Python server
-          hash: doc_id, // (for now, use docId as hash)
-          text: text, // Store extracted PDF text
-          transcript: pdfTranscript, // Store structured transcript from Python
+          image_id: image_id,
+          title: title as string,
+          description: description as string,
+          image_url: imageUrl,
+          text: text,
         },
       },
       metadata: {
@@ -158,7 +160,7 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  // Ensure userContent relation exists (fix for summary API)
+  // Ensure userContent relation exists
   await prisma.userContent.upsert({
     where: {
       user_id_content_id: {

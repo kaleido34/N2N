@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/auth-provider";
 import { useSpaces } from "@/hooks/space-provider";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Loader2, Paperclip, FileText, Image as ImageIcon, Video, Music } from "lucide-react";
+import { ArrowRight, Loader2, Paperclip, FileText, Image as ImageIcon, Music } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -281,9 +281,6 @@ export function ContentForm() {
               <DropdownMenuItem className="flex items-center gap-2 cursor-pointer dark:text-white" onClick={() => { fileInputRef.current?.setAttribute('accept', 'audio/*'); fileInputRef.current?.click(); }}>
                 <Music className="h-4 w-4" /> Audio
               </DropdownMenuItem>
-              <DropdownMenuItem className="flex items-center gap-2 cursor-pointer dark:text-white" onClick={() => { fileInputRef.current?.setAttribute('accept', 'video/*'); fileInputRef.current?.click(); }}>
-                <Video className="h-4 w-4" /> Video
-              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -300,7 +297,7 @@ export function ContentForm() {
           ref={fileInputRef}
           onChange={handleFileChange}
           className="hidden"
-          accept="application/pdf,image/*,audio/*,video/*"
+          accept="application/pdf,image/*,audio/*"
         />
       </form>
       

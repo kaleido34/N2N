@@ -45,6 +45,9 @@ export async function GET(
               include: {
                 youtubeContent: true,
                 documentContent: true,
+                audioContent: true,
+                imageContent: true,
+                metadata: true,
               },
             },
           },
@@ -53,6 +56,7 @@ export async function GET(
     });
 
     if (!space) {
+      console.log(`[API] GET /api/spaces/${spaceId} from user ${userId}`);
       return NextResponse.json(
         { message: "Space not found or not yours" },
         { status: 404 }
@@ -64,7 +68,7 @@ export async function GET(
       id: space.space_id,
       name: space.space_name,
       createdAt: space.created_at,
-      contents: space.contents.map((spaceContent) => ({
+      contents: space.contents.map((spaceContent: any) => ({
         id: spaceContent.content.content_id,
         type: spaceContent.content.content_type,
         createdAt: spaceContent.content.created_at,
@@ -86,11 +90,16 @@ export async function GET(
   }
 }
 
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(req: NextRequest) {
   try {
+    // Get the space ID from the URL path instead of params
+    const pathParts = req.nextUrl.pathname.split('/');
+    const spaceId = pathParts[pathParts.length - 1]; // Last segment of the URL path
+    
+    if (!spaceId) {
+      return NextResponse.json({ message: "Space ID is required" }, { status: 400 });
+    }
+
     const authHeader = req.headers.get("Authorization") || "";
     const token = authHeader.split(" ")[1];
     if (!token) {
@@ -106,11 +115,11 @@ export async function DELETE(
         { status: 401 }
       );
     }
-
+    
     // Check if space exists and belongs to user
     const space = await prisma.space.findFirst({
       where: {
-        space_id: params.id,
+        space_id: spaceId,
         user_id: userId,
       },
     });
@@ -125,7 +134,7 @@ export async function DELETE(
     // Delete the space
     await prisma.space.delete({
       where: {
-        space_id: params.id,
+        space_id: spaceId,
       },
     });
 

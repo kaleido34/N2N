@@ -319,50 +319,96 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "ID is required" }, { status: 400 });
   }
 
-  // Try to find as YouTube content first
-  const youtubeContent = await prisma.youtubeContent.findUnique({
-    where: { content_id: id },
-    include: {
-      content: {
-        select: {
-          content_type: true,
-        },
-      },
-    },
-  });
-
-  if (youtubeContent) {
-    return NextResponse.json({
-      youtubeUrl: youtubeContent.youtube_url,
-      youtube_id: youtubeContent.youtube_id,
-      thumbnailUrl: youtubeContent.thumbnail_url,
-      transcript: youtubeContent.transcript,
-      type: "YOUTUBE_CONTENT",
+  try {
+    // Try to find basic content information first
+    const content = await prisma.content.findUnique({
+      where: { content_id: id },
+      include: { metadata: true }
     });
-  }
 
-  // Try to find as Document content
-  const documentContent = await prisma.documentContent.findUnique({
-    where: { content_id: id },
-    include: {
-      content: {
-        select: {
-          content_type: true,
-        },
-      },
-    },
-  });
+    if (!content) {
+      return NextResponse.json({ error: "Content not found" }, { status: 404 });
+    }
 
-  if (documentContent) {
-    return NextResponse.json({
-      filename: documentContent.filename,
-      file_url: documentContent.file_url,
-      doc_id: documentContent.doc_id,
-      hash: documentContent.hash,
-      type: "DOCUMENT_CONTENT",
-      text: documentContent.text,
+    // Try to find as YouTube content
+    const youtubeContent = await prisma.youtubeContent.findUnique({
+      where: { content_id: id }
     });
-  }
 
-  return NextResponse.json({ error: "Content not found" }, { status: 404 });
+    // Try to find as Document content
+    const documentContent = await prisma.documentContent.findUnique({
+      where: { content_id: id },
+      include: { content: { include: { metadata: true } } }
+    });
+
+    // Prepare summary array based on content type
+    let summaryText = [];
+    let title = 'Untitled Content';
+    
+    // Get summary from unified metadata if available
+    if (content.metadata?.summary) {
+      try {
+        // Try to parse as JSON first
+        summaryText = JSON.parse(content.metadata.summary);
+      } catch (e) {
+        // If not JSON, treat as a single paragraph
+        summaryText = [content.metadata.summary];
+      }
+    }
+    
+    // Set title based on content type
+    if (youtubeContent) {
+      title = youtubeContent.title;
+    } else if (documentContent) {
+      title = documentContent.filename;
+    } else if (content.audioContent) {
+      title = content.audioContent.title || 'Audio Content';
+    } else if (content.imageContent) {
+      title = content.imageContent.title || 'Image Content';
+    }
+    
+    // Ensure summaryText is always an array
+    if (!Array.isArray(summaryText)) {
+      summaryText = [summaryText];
+    }
+    
+    // Construct a response with all the necessary data
+    const response = {
+      id: content.content_id,
+      title: title,
+      summary: summaryText,
+      content_type: content.content_type,
+      created_at: content.created_at?.toISOString(),
+    };
+
+    // Add YouTube-specific data if it exists
+    if (youtubeContent) {
+      return NextResponse.json({
+        ...response,
+        youtube_url: youtubeContent.youtube_url,
+        youtube_id: youtubeContent.youtube_id,
+        transcript: youtubeContent.transcript,
+        type: "YOUTUBE_CONTENT"
+      });
+    }
+
+    // Add Document-specific data if it exists
+    if (documentContent) {
+      return NextResponse.json({
+        ...response,
+        filename: documentContent.filename,
+        file_url: documentContent.file_url,
+        doc_id: documentContent.doc_id,
+        hash: documentContent.hash,
+        text: documentContent.text,
+        type: "DOCUMENT_CONTENT"
+      });
+    }
+
+    // Return basic content if no specific content type was found
+    return NextResponse.json(response);
+  } catch (error) {
+    console.error('Error fetching content:', error);
+    return NextResponse.json({ error: "Failed to fetch content" }, { status: 500 });
+  }
 }

@@ -5,6 +5,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+interface TranscriptsDialogProps {
+  transcriptData: any;
+  transcriptLoading: boolean;
+  contentId?: string;
+  youtubeId?: string;
+}
+
 interface Transcript {
   id: string;
   title: string;
@@ -12,11 +19,11 @@ interface Transcript {
   content: string;
 }
 
-export function TranscriptsDialog() {
+export function TranscriptsDialog({ transcriptData, transcriptLoading, contentId, youtubeId }: TranscriptsDialogProps) {
   const [open, setOpen] = useState(false);
 
-  // Sample transcript data
-  const transcripts: Transcript[] = [
+  // Sample transcript data - use as fallback if real data isn't available
+  const sampleTranscripts: Transcript[] = [
     {
       id: "transcript-1",
       title: "Microsoft's Open Source Moves",
@@ -83,6 +90,12 @@ This shift aligns with the broader history of development tools, where open sour
         </button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[750px] p-0 overflow-hidden bg-[#FAF7F8] dark:bg-gray-900">
+        {transcriptLoading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#5B4B8A]"></div>
+          </div>
+        ) : (
+
         <div className="flex flex-col">
           <div className="flex items-center gap-3 p-3 border-b">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center">
@@ -98,18 +111,31 @@ This shift aligns with the broader history of development tools, where open sour
           <div className="p-4">
             <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm">
               <div className="flex justify-between items-center mb-3">
-                <h3 className="text-lg font-medium text-[#5B4B8A] dark:text-white">{transcripts[0].title}</h3>
-                <span className="text-sm text-gray-500 dark:text-gray-400">{transcripts[0].date}</span>
+                <h3 className="text-lg font-medium text-[#5B4B8A] dark:text-white">
+                  {transcriptData ? "Lecture Transcript" : sampleTranscripts[0].title}
+                </h3>
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  {transcriptData?.timestamp || (new Date()).toLocaleDateString()}
+                </span>
               </div>
               
               <div className="prose dark:prose-invert max-w-none">
                 <pre className="whitespace-pre-wrap text-sm font-normal text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 p-4 rounded-md overflow-auto max-h-[400px]">
-                  {transcripts[0].content}
+                  {transcriptData ? (
+                    Array.isArray(transcriptData) ? 
+                      transcriptData.map((item: any, index: number) => (
+                        <div key={index} className="mb-2">
+                          <span className="text-xs text-gray-500">[{item.startTime || ''}]</span> {item.text}
+                        </div>
+                      ))
+                    : transcriptData.text || "No transcript content available."
+                  ) : sampleTranscripts[0].content}
                 </pre>
               </div>
             </div>
           </div>
         </div>
+        )}
       </DialogContent>
     </Dialog>
   );

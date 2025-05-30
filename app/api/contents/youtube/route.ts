@@ -1,4 +1,4 @@
-import { fetchTranscripts, preprocessTranscript, transcriptInterface, upsertChunksToPinecone, initializePinecone } from "@/lib/utils";
+import { fetchTranscripts, preprocessTranscript, transcriptInterface } from "@/lib/utils";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma"
 import { v4 as uuid } from "uuid"
@@ -131,6 +131,15 @@ export async function POST(req: NextRequest) {
                             user_id: user.user_id
                         }
                     }
+                }
+            });
+            
+            // Initialize an empty metadata record for this content
+            await prisma.metadata.create({
+                data: {
+                    content_id: contentId,
+                    created_at: new Date(),
+                    updated_at: new Date()
                 }
             });
         }

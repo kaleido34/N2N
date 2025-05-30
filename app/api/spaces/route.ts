@@ -31,6 +31,9 @@ export async function GET(req: NextRequest) {
               include: {
                 youtubeContent: true, // Include YouTube-specific data
                 documentContent: true, // Include Document-specific data
+                audioContent: true, // Include Audio-specific data
+                imageContent: true, // Include Image-specific data
+                metadata: true, // Include unified metadata
               },
             },
           },
@@ -42,11 +45,11 @@ export async function GET(req: NextRequest) {
     console.log(`[API] GET /api/spaces request from user ${userId}`);
     
     // 4) Transform the data into a front-end-friendly shape if needed
-    const spaces = userSpaces.map((space) => ({
+    const spaces = userSpaces.map((space: any) => ({
       id: space.space_id,
       name: space.space_name,
       createdAt: space.created_at,
-      contents: space.contents.map((spaceContent) => ({
+      contents: space.contents.map((spaceContent: any) => ({
         id: spaceContent.content.content_id,
         type: spaceContent.content.content_type,
         createdAt: spaceContent.content.created_at,

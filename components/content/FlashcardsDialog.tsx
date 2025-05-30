@@ -5,6 +5,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 
+interface FlashcardsDialogProps {
+  flashcardsData: any;
+  flashcardsLoading: boolean;
+  contentId?: string;
+  youtubeId?: string;
+}
+
 interface Flashcard {
   id: number;
   question: string;
@@ -30,13 +37,15 @@ const sampleFlashcards: Flashcard[] = [
   // Add more flashcards as needed
 ];
 
-export function FlashcardsDialog() {
+export function FlashcardsDialog({ flashcardsData, flashcardsLoading, contentId, youtubeId }: FlashcardsDialogProps) {
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [open, setOpen] = useState(false);
-
-  const currentCard = sampleFlashcards[currentCardIndex];
-  const totalCards = sampleFlashcards.length;
+  
+  // Use real flashcards data if available, otherwise use sample
+  const flashcards = flashcardsData?.flashcards || sampleFlashcards;
+  const currentCard = flashcards[currentCardIndex];
+  const totalCards = flashcards.length;
 
   const handleNext = () => {
     if (currentCardIndex < totalCards - 1) {
@@ -77,6 +86,15 @@ export function FlashcardsDialog() {
         </button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[580px] p-0 overflow-hidden bg-[#FAF7F8] dark:bg-gray-900">
+        {flashcardsLoading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#5B4B8A]"></div>
+          </div>
+        ) : !flashcards || flashcards.length === 0 ? (
+          <div className="flex items-center justify-center h-64">
+            <p>No flashcards available.</p>
+          </div>
+        ) : (
         <div className="flex flex-col">
           <div className="flex items-center gap-3 p-3 border-b">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center">
@@ -142,6 +160,7 @@ export function FlashcardsDialog() {
             </div>
           </div>
         </div>
+        )}
       </DialogContent>
     </Dialog>
   );

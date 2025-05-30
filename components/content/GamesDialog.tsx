@@ -4,6 +4,12 @@ import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
+interface GamesDialogProps {
+  // For consistency with other dialog components
+  contentId?: string;
+  youtubeId?: string;
+}
+
 interface GameOption {
   id: string;
   title: string;
@@ -12,7 +18,7 @@ interface GameOption {
   icon: React.ReactNode;
 }
 
-export function GamesDialog() {
+export function GamesDialog({ contentId, youtubeId }: GamesDialogProps) {
   const [open, setOpen] = useState(false);
 
   const gameOptions: GameOption[] = [

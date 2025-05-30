@@ -6,16 +6,26 @@ import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 
+interface QuizDialogProps {
+  quizData: any;
+  quizLoading: boolean;
+  contentId?: string;
+  youtubeId?: string;
+}
+
 interface Question {
   id: number;
   question: string;
   options: string[];
-  correctAnswer: number;
+  correct_option: string;
+  explanation?: string;
+  timestamp?: string;
 }
 
 type AnswerState = 'unanswered' | 'correct' | 'incorrect';
 
-const sampleQuestions: Question[] = [
+// Backup sample questions in case real data isn't available
+const sampleQuestions = [
   {
     id: 1,
     question: "What significant action did Microsoft take regarding GitHub Copilot?",
@@ -41,7 +51,7 @@ const sampleQuestions: Question[] = [
   // Add more questions as needed
 ];
 
-export function QuizDialog() {
+export function QuizDialog({ quizData, quizLoading, contentId, youtubeId }: QuizDialogProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [answerState, setAnswerState] = useState<AnswerState>('unanswered');
@@ -50,8 +60,10 @@ export function QuizDialog() {
   const [answeredQuestions, setAnsweredQuestions] = useState<Set<number>>(new Set());
   const [open, setOpen] = useState(false);
 
-  const currentQuestion = sampleQuestions[currentQuestionIndex];
-  const totalQuestions = sampleQuestions.length;
+  // Use real quiz data if available, otherwise use sample
+  const questions = quizData?.questions || sampleQuestions;
+  const currentQuestion = questions[currentQuestionIndex];
+  const totalQuestions = questions.length;
 
   const checkAnswer = () => {
     const isCorrect = selectedOption === currentQuestion.correctAnswer;
@@ -101,6 +113,15 @@ export function QuizDialog() {
         </button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[650px] p-0 overflow-hidden bg-[#FAF7F8] dark:bg-gray-900">
+        {quizLoading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#5B4B8A]"></div>
+          </div>
+        ) : !questions || questions.length === 0 ? (
+          <div className="flex items-center justify-center h-64">
+            <p>No quiz questions available.</p>
+          </div>
+        ) : (
         <div className="flex flex-col">
           <div className="flex items-center gap-3 p-3 border-b">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
@@ -124,7 +145,7 @@ export function QuizDialog() {
                     const selectedIndex = parseInt(value);
                     setSelectedOption(selectedIndex);
                     // Check if the answer is correct and if this question has been answered before
-                    if (selectedIndex === currentQuestion.correctAnswer && !answeredQuestions.has(currentQuestionIndex)) {
+                    if (currentQuestion.options[selectedIndex] === currentQuestion.correct_option && !answeredQuestions.has(currentQuestionIndex)) {
                       setAnswerState('correct');
                       setScore(prevScore => prevScore + 1);
                       setAnsweredQuestions(prev => new Set(prev).add(currentQuestionIndex));
@@ -134,12 +155,12 @@ export function QuizDialog() {
                   }}
                   className="space-y-3"
                 >
-                  {currentQuestion.options.map((option, index) => (
+                  {currentQuestion.options.map((option: string, index: number) => (
                     <div 
                       key={index} 
                       className={`flex items-center space-x-2 py-1 px-2 rounded-md
-                        ${selectedOption !== null && index === currentQuestion.correctAnswer ? 'bg-green-50 dark:bg-green-900/20 border border-green-200' : ''}
-                        ${selectedOption !== null && index === selectedOption && index !== currentQuestion.correctAnswer ? 'bg-red-50 dark:bg-red-900/20 border border-red-200' : ''}
+                        ${selectedOption !== null && option === currentQuestion.correct_option ? 'bg-green-50 dark:bg-green-900/20 border border-green-200' : ''}
+                        ${selectedOption !== null && index === selectedOption && option !== currentQuestion.correct_option ? 'bg-red-50 dark:bg-red-900/20 border border-red-200' : ''}
                       `}
                     >
                       <RadioGroupItem value={index.toString()} id={`option-${index}`} className="text-[#5B4B8A]" />
@@ -182,6 +203,7 @@ export function QuizDialog() {
             </div>
           )}
         </div>
+        )}
       </DialogContent>
     </Dialog>
   );

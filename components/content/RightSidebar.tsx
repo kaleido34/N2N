@@ -32,7 +32,35 @@ import { GamesDialog } from "./GamesDialog";
 import { AudioPlayer } from "./AudioPlayer";
 import { TranscriptsDialog } from "./TranscriptsDialog";
 
-export default function RightSidebar() {
+interface RightSidebarProps {
+  contentId?: string;
+  youtubeId?: string;
+  mindmapData: any;
+  mindmapLoading: boolean;
+  quizData: any;
+  quizLoading: boolean;
+  flashcardsData: any;
+  flashcardsLoading: boolean;
+  audioData: any;
+  audioLoading: boolean;
+  transcriptData: any;
+  transcriptLoading: boolean;
+}
+
+export default function RightSidebar({
+  contentId,
+  youtubeId,
+  mindmapData,
+  mindmapLoading,
+  quizData,
+  quizLoading,
+  flashcardsData,
+  flashcardsLoading,
+  audioData,
+  audioLoading,
+  transcriptData,
+  transcriptLoading
+}: RightSidebarProps) {
   const { user, logout } = useAuth();
   const router = useRouter();
   const [showAudioPlayer, setShowAudioPlayer] = useState(false);
@@ -80,13 +108,28 @@ export default function RightSidebar() {
         </h3>
         <div className="space-y-1 px-2">
           {/* Take a Quiz */}
-          <QuizDialog />
+          <QuizDialog 
+            quizData={quizData}
+            quizLoading={quizLoading}
+            contentId={contentId}
+            youtubeId={youtubeId}
+          />
 
           {/* View Flashcards */}
-          <FlashcardsDialog />
+          <FlashcardsDialog 
+            flashcardsData={flashcardsData}
+            flashcardsLoading={flashcardsLoading}
+            contentId={contentId}
+            youtubeId={youtubeId}
+          />
 
           {/* Create Mindmap */}
-          <MindmapDialog />
+          <MindmapDialog 
+            mindmapData={mindmapData}
+            mindmapLoading={mindmapLoading}
+            contentId={contentId}
+            youtubeId={youtubeId}
+          />
 
           {/* Play Games */}
           <GamesDialog />
@@ -103,7 +146,12 @@ export default function RightSidebar() {
           </button>
 
           {/* Transcripts */}
-          <TranscriptsDialog />
+          <TranscriptsDialog 
+            transcriptData={transcriptData}
+            transcriptLoading={transcriptLoading}
+            contentId={contentId}
+            youtubeId={youtubeId}
+          />
         </div>
       </div>
 
@@ -135,7 +183,11 @@ export default function RightSidebar() {
       <AudioPlayer 
         isVisible={showAudioPlayer} 
         onClose={() => setShowAudioPlayer(false)} 
-        title="Microsoft's Open Source Moves - Lecture Audio"
+        title="Content Audio"
+        audioData={audioData}
+        audioLoading={audioLoading}
+        contentId={contentId}
+        youtubeId={youtubeId}
       />
     </aside>
   );

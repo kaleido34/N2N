@@ -43,7 +43,10 @@ export async function DELETE(req: NextRequest, { params }: { params: { contentId
     where: { content_id: contentId },
   });
   if (otherLinks.length === 0) {
+    // Delete associated metadata first
+    await prisma.metadata.deleteMany({ where: { content_id: contentId } });
+    // Then delete the content
     await prisma.content.delete({ where: { content_id: contentId } });
   }
   return NextResponse.json({ success: true });
-} 
+}

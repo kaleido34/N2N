@@ -9,17 +9,21 @@ export const config = {
   },
 };
 
-async function extractTextFromPDFWithPython(file: Blob): Promise<string> {
+async function extractTextFromAudioWithPython(file: Blob): Promise<{ audio_id: string, text: string, transcript: any }> {
   const formData = new FormData();
   formData.append("file", file);
   // Call the Python extractor server
-  const res = await fetch("http://localhost:5005/extract/pdf", {
+  const res = await fetch("http://localhost:5005/extract/audio", {
     method: "POST",
     body: formData,
   });
-  if (!res.ok) throw new Error("Failed to extract PDF text via Python server");
+  if (!res.ok) throw new Error("Failed to extract audio text via Python server");
   const data = await res.json();
-  return data.text || "";
+  return {
+    audio_id: data.audio_id,
+    text: data.text || "",
+    transcript: data.transcript
+  };
 }
 
 export async function POST(req: NextRequest) {
@@ -28,6 +32,8 @@ export async function POST(req: NextRequest) {
   const file = formData.get("file");
   const userId = formData.get("userId");
   const spaceId = formData.get("spaceId");
+  const title = formData.get("title") || "Unnamed Audio";
+  const description = formData.get("description") || "";
 
   if (!file || !(file instanceof Blob)) {
     return new Response("No file uploaded", { status: 400 });
@@ -56,64 +62,25 @@ export async function POST(req: NextRequest) {
     finalSpaceId = defaultSpace.space_id;
   }
 
-  // Extract text from PDF using Python server
-  let pdfData;
+  // Extract text from audio using Python server with Whisper
+  let audioData;
   try {
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await fetch("http://localhost:5005/extract/pdf", {
-      method: "POST",
-      body: formData,
-    });
-    if (!res.ok) throw new Error("Failed to extract PDF text via Python server");
-    pdfData = await res.json();
+    audioData = await extractTextFromAudioWithPython(file);
   } catch (err) {
-    return new Response("Failed to extract PDF text", { status: 500 });
+    console.error("Failed to extract audio transcription:", err);
+    return new Response("Failed to transcribe audio", { status: 500 });
   }
 
-  const { doc_id, text, transcript: pdfTranscript } = pdfData;
+  const { audio_id, text, transcript } = audioData;
 
-  // --- Split text into transcript-like segments ---
-  function splitTextToTranscript(text: string, segmentWordCount = 60): transcriptInterface[] {
-    const sentences = text.match(/[^.!?\n]+[.!?\n]+/g) || [text];
-    let transcript: transcriptInterface[] = [];
-    let buffer = "";
-    let wordCount = 0;
-    let offset = 0;
-    let idx = 0;
-    for (const sentence of sentences) {
-      const words = sentence.trim().split(/\s+/);
-      buffer += (buffer ? " " : "") + sentence.trim();
-      wordCount += words.length;
-      if (wordCount >= segmentWordCount) {
-        transcript.push({
-          text: buffer,
-          duration: 0, // Not available for docs
-          offset: idx,
-          lang: "en",
-        });
-        idx += wordCount;
-        buffer = "";
-        wordCount = 0;
-      }
-    }
-    if (buffer) {
-      transcript.push({ text: buffer, duration: 0, offset: idx, lang: "en" });
-    }
-    return transcript;
-  }
-
-  const transcriptArr = splitTextToTranscript(text);
-  const transcriptText = transcriptArr.map(t => t.text).join(" ");
-
-  // --- Generate AI features ---
+  // Generate AI features using the transcribed text
   let quiz = null, flashcards = null, mindmap = null, summary = null;
   try {
     [quiz, flashcards, mindmap, summary] = await Promise.all([
-      generateQuiz(transcriptText),
-      generateFlashCards(transcriptText),
-      generateMindMap(transcriptText),
-      summarizeChunks(transcriptText),
+      generateQuiz(text),
+      generateFlashCards(text),
+      generateMindMap(text),
+      summarizeChunks(text),
     ]);
   } catch (err) {
     // If AI fails, continue with what we have
@@ -122,19 +89,25 @@ export async function POST(req: NextRequest) {
 
   // Create new content/lesson in DB
   const contentId = uuid();
-  const filename = (file as File).name || "uploaded.pdf";
+  const filename = (file as File).name || "audio.mp3";
+  const audioUrl = ""; // In a real app, you'd upload to S3 and get URL
+  const duration = transcript.segments.length > 0 
+    ? Math.round(transcript.segments[transcript.segments.length - 1].end) 
+    : 0;
+
+  // Create content with audioContent
   await prisma.content.create({
     data: {
       content_id: contentId,
-      content_type: "DOCUMENT_CONTENT",
-      documentContent: {
+      content_type: "AUDIO_CONTENT",
+      audioContent: {
         create: {
-          filename: filename,
-          file_url: "", // (optional: upload to S3 or similar)
-          doc_id: doc_id, // Use the ID from the Python server
-          hash: doc_id, // (for now, use docId as hash)
-          text: text, // Store extracted PDF text
-          transcript: pdfTranscript, // Store structured transcript from Python
+          audio_id: audio_id,
+          title: title as string,
+          description: description as string,
+          audio_url: audioUrl,
+          duration: duration,
+          transcript: transcript,
         },
       },
       metadata: {
@@ -158,7 +131,7 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  // Ensure userContent relation exists (fix for summary API)
+  // Ensure userContent relation exists
   await prisma.userContent.upsert({
     where: {
       user_id_content_id: {

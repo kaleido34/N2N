@@ -3,10 +3,99 @@
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import * as go from "gojs";
+import { ReactDiagram } from "gojs-react";
 
-export function MindmapDialog() {
+interface MindmapDialogProps {
+  mindmapData: any;
+  mindmapLoading: boolean;
+  contentId?: string;
+  youtubeId?: string;
+}
+
+export function MindmapDialog({ mindmapData, mindmapLoading, contentId, youtubeId }: MindmapDialogProps) {
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  
+  // Initialize the diagram
+  function initDiagram() {
+    const $ = go.GraphObject.make;
+    const diagram = $(go.Diagram, {
+      "undoManager.isEnabled": true,
+      layout: $(go.TreeLayout, {
+        angle: 90,
+        layerSpacing: 35,
+        alignment: go.TreeLayout.AlignmentStart
+      }),
+      model: $(go.GraphLinksModel, {
+        linkKeyProperty: "key"
+      })
+    });
+ 
+    // @ts-expect-error diagram.background type is unknown
+    diagram.background = "white";
+
+    // Define node templates for different categories
+    const rootTemplate = $(go.Node, "Auto",
+      $(go.Shape, "RoundedRectangle", { 
+        fill: "#5B4B8A",
+        stroke: "black" 
+      }),
+      $(go.TextBlock, { 
+        margin: 8, 
+        stroke: "white",
+        font: "14px sans-serif"
+      },
+        new go.Binding("text", "text"))
+    );
+
+    const sectionTemplate = $(go.Node, "Auto",
+      $(go.Shape, "RoundedRectangle", { 
+        fill: "#7B5EA7",
+        stroke: "black"
+      }),
+      $(go.TextBlock, { 
+        margin: 8,
+        stroke: "white",
+        font: "14px sans-serif"
+      },
+        new go.Binding("text", "text"))
+    );
+
+    const topicTemplate = $(go.Node, "Auto",
+      $(go.Shape, "RoundedRectangle", { 
+        fill: "#9C7BC0",
+        stroke: "black"
+      }),
+      $(go.TextBlock, { 
+        margin: 8,
+        stroke: "white",
+        font: "14px sans-serif"
+      },
+        new go.Binding("text", "text"))
+    );
+
+    diagram.nodeTemplateMap.add("root", rootTemplate);
+    diagram.nodeTemplateMap.add("section", sectionTemplate);
+    diagram.nodeTemplateMap.add("topic", topicTemplate);
+    
+    // Default template for nodes without a category
+    diagram.nodeTemplate = $(go.Node, "Auto",
+      $(go.Shape, "RoundedRectangle", { fill: "#BDBDBD", stroke: "black" }),
+      $(go.TextBlock, { margin: 8, stroke: "black", font: "14px sans-serif" }, new go.Binding("text", "text"))
+    );
+
+    diagram.linkTemplate =
+      $(go.Link,
+        { routing: go.Link.Orthogonal },
+        $(go.Shape, { 
+          strokeWidth: 1.5,
+          stroke: "#5B4B8A"
+        })
+      );
+
+    return diagram;
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -37,48 +126,26 @@ export function MindmapDialog() {
           <div className="flex-1 p-6 pb-0">
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm">
               <div className="overflow-auto" style={{ height: '320px', width: '100%' }}>
-                <div style={{ width: expanded ? '1300px' : '600px', height: '100%', position: 'relative', padding: '20px' }}>
-                  {/* Main node */}
-                  <div className="absolute top-[30px] left-1/2 transform -translate-x-1/2 bg-gray-200 dark:bg-gray-700 rounded-lg p-4 shadow-md w-[350px] text-center">
-                    <p className="font-medium text-[#5B4B8A] dark:text-white">Microsoft's Open Source Moves & AI Development</p>
-                  </div>
-                  
-                  {/* Connection lines */}
-                  <svg className="absolute top-0 left-0 w-full h-full" style={{ zIndex: 0 }}>
-                    {/* Line from main to left node */}
-                    <line x1="50%" y1="70px" x2="25%" y2="120px" stroke="#ccc" strokeWidth="3" />
-                    
-                    {/* Line from main to right node */}
-                    <line x1="50%" y1="70px" x2="70%" y2="120px" stroke="#ccc" strokeWidth="3" />
-                    
-                    {/* Lines from left node to sub-nodes */}
-                    <line x1="25%" y1="150px" x2="15%" y2="200px" stroke="#ccc" strokeWidth="3" />
-                    <line x1="25%" y1="150px" x2="30%" y2="200px" stroke="#ccc" strokeWidth="3" />
-                    <line x1="25%" y1="150px" x2="45%" y2="200px" stroke="#ccc" strokeWidth="3" />
-                  </svg>
-                  
-                  {/* Left node */}
-                  <div className="absolute top-[150px] left-[30%] transform -translate-x-1/2 bg-gray-200 dark:bg-gray-700 rounded-lg p-4 shadow-md w-[250px] text-center">
-                    <p className="font-medium text-[#5B4B8A] dark:text-white">Open Sourcing GitHub Copilot</p>
-                  </div>
-                  
-                  {/* Right node */}
-                  <div className="absolute top-[150px] left-[70%] transform -translate-x-1/2 bg-gray-200 dark:bg-gray-700 rounded-lg p-4 shadow-md w-[250px] text-center">
-                    <p className="font-medium text-[#5B4B8A] dark:text-white">Impact of Open Sourcing Copilot</p>
-                  </div>
-                  
-                  {/* Sub-nodes */}
-                  <div className="absolute top-[250px] left-[15%] transform -translate-x-1/2 bg-gray-200 dark:bg-gray-700 rounded-lg p-3 shadow-md w-[150px] text-center">
-                    <p className="text-sm text-[#5B4B8A] dark:text-white">Free and Open</p>
-                  </div>
-                  
-                  <div className="absolute top-[250px] left-[30%] transform -translate-x-1/2 bg-gray-200 dark:bg-gray-700 rounded-lg p-3 shadow-md w-[150px] text-center">
-                    <p className="text-sm text-[#5B4B8A] dark:text-white">Fork, Modify</p>
-                  </div>
-                  
-                  <div className="absolute top-[250px] left-[45%] transform -translate-x-1/2 bg-gray-200 dark:bg-gray-700 rounded-lg p-3 shadow-md w-[150px] text-center">
-                    <p className="text-sm text-[#5B4B8A] dark:text-white">Open Sourcing WSL</p>
-                  </div>
+                <div className="relative flex-1 rounded-lg bg-white dark:bg-white overflow-hidden" style={{ minHeight: expanded ? 400 : 300, width: expanded ? '1300px' : '600px' }}>
+                  {mindmapLoading ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-white/80">
+                      <div className="flex flex-col items-center gap-4">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#5B4B8A]"></div>
+                        <p className="text-[#5B4B8A] font-medium">Generating mindmap...</p>
+                      </div>
+                    </div>
+                  ) : mindmapData ? (
+                    <ReactDiagram
+                      initDiagram={initDiagram}
+                      divClassName="diagram-component h-full w-full"
+                      nodeDataArray={mindmapData.nodes}
+                      linkDataArray={mindmapData.links}
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <p>No mindmap data available.</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -14,9 +14,16 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Otherwise, check the token
-  const authHeader = req.headers.get("Authorization") || "";
-  const token = authHeader.split(" ")[1]; // "Bearer <token>"
+  // Otherwise, check the token (case-insensitive)
+  const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
+  let token = "";
+  
+  // Handle both formats: "Bearer token" or just "token"
+  if (authHeader.startsWith("Bearer ")) {
+    token = authHeader.slice(7);
+  } else {
+    token = authHeader;
+  }
 
   if (!token) {
     return NextResponse.json(
