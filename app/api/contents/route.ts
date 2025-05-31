@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import prisma from "@/lib/prisma";
 import axios from "axios";
 import { v4 as uuid } from "uuid";
+import { authenticateUser } from "@/lib/auth-helpers";
 
 // Import only what you need - remove embedding-related imports
 import { fetchTranscripts, preprocessTranscript, transcriptInterface } from "@/lib/utils";
@@ -30,41 +30,14 @@ function extractYoutubeId(url: string): string | null {
 export async function POST(req: NextRequest) {
   try {
     // ----------------------------------------------------------------------
-    // 1) Verify JWT token from the Authorization header
+    // 1) Authenticate user with centralized helper
     // ----------------------------------------------------------------------
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return NextResponse.json(
-        { error: "Missing Authorization header" },
-        { status: 401 }
-      );
+    const { user, error } = await authenticateUser(req);
+    if (error) {
+      return error;
     }
-
-    const token = authHeader.replace("Bearer ", "");
-    let decoded: { user_id?: string };
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET!) as { user_id?: string };
-      // Replace "secret_key" with your real JWT secret or env var
-    } catch (err) {
-      console.error("JWT verification failed:", err);
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-
-    const userId = decoded?.user_id;
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Invalid token payload" },
-        { status: 401 }
-      );
-    }
-
-    // Ensure the user actually exists in the DB
-    const existingUser = await prisma.user.findUnique({
-      where: { user_id: userId },
-    });
-    if (!existingUser) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
+    
+    const userId = user.user_id;
 
     // ----------------------------------------------------------------------
     // 2) Parse request body: { youtube_url, space_id }

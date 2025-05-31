@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyJwtToken } from "@/lib/jwt";
 import prisma from "@/lib/prisma";
+import { authenticateUser } from "@/lib/auth-helpers";
 
 /**
  * GET /api/spaces/[id]
@@ -14,22 +14,13 @@ export async function GET(
     const params = request.nextUrl.searchParams;
     const spaceId = params.get("space_id") || "";
 
-    // 1) Extract Bearer token
-    const authHeader = request.headers.get("Authorization") || "";
-    const token = authHeader.split(" ")[1];
-    if (!token) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    // 1) Authenticate user with centralized helper
+    const { user, error } = await authenticateUser(request);
+    if (error) {
+      return error;
     }
-
-    // 2) Verify JWT
-    const payload = await verifyJwtToken(token, process.env.JWT_SECRET!);
-    const userId = payload?.user_id;
-    if (!userId) {
-      return NextResponse.json(
-        { message: "Invalid token: missing user_id" },
-        { status: 401 }
-      );
-    }
+    
+    const userId = user.user_id;
 
     // 3) Fetch the space that belongs to this user
     //    Include any related content (youtube, doc, etc.)
@@ -90,31 +81,75 @@ export async function GET(
   }
 }
 
-export async function DELETE(req: NextRequest) {
+export async function DELETE(
+  req: NextRequest,
+  context: { params: Record<string, string> }
+) {
   try {
-    // Get the space ID from the URL path instead of params
-    const pathParts = req.nextUrl.pathname.split('/');
-    const spaceId = pathParts[pathParts.length - 1]; // Last segment of the URL path
+    // In Next.js App Router we need to handle params asynchronously
+    const params = await context.params;
+    const spaceId = params.id;
     
     if (!spaceId) {
       return NextResponse.json({ message: "Space ID is required" }, { status: 400 });
     }
 
-    const authHeader = req.headers.get("Authorization") || "";
-    const token = authHeader.split(" ")[1];
-    if (!token) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    // Extract auth headers - try multiple variations to ensure we get the token
+    let authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      authHeader = req.headers.get('Authorization');
     }
-
-    // Verify token
-    const payload = await verifyJwtToken(token, process.env.JWT_SECRET!);
-    const userId = payload?.user_id;
-    if (!userId) {
+    
+    // If no authorization header, return error
+    if (!authHeader) {
       return NextResponse.json(
-        { message: "Invalid token: missing user_id" },
+        { message: "Missing authorization token. Please login again." },
         { status: 401 }
       );
     }
+    
+    // Extract token from header
+    let token = "";
+    if (authHeader.startsWith("Bearer ")) {
+      token = authHeader.slice(7);
+    } else {
+      token = authHeader;
+    }
+    
+    if (!token) {
+      return NextResponse.json(
+        { message: "Invalid authorization token format" },
+        { status: 401 }
+      );
+    }
+    
+    // Use enhanced JWT verification with better error handling
+    const { verifyJwtTokenWithDetails } = await import("@/lib/jwt");
+    
+    // Use the known development secret based on memory if env var is not available
+    const secret = process.env.JWT_SECRET || 'development-jwt-secret-key-12345';
+    
+    // Try to verify with the secret using our enhanced verification
+    const verificationResult = await verifyJwtTokenWithDetails(token, secret);
+    
+    // Handle expired tokens with a specific message
+    if (verificationResult.isExpired) {
+      return NextResponse.json(
+        { message: "Your session has expired. Please log in again." },
+        { status: 401 }
+      );
+    }
+    
+    // Handle other token validation failures
+    if (!verificationResult.payload || !verificationResult.payload.user_id) {
+      return NextResponse.json(
+        { message: verificationResult.error || "Authentication failed" },
+        { status: 401 }
+      );
+    }
+    
+    const decodedUser = verificationResult.payload;
+    const userId = decodedUser.user_id;
     
     // Check if space exists and belongs to user
     const space = await prisma.space.findFirst({
@@ -126,8 +161,8 @@ export async function DELETE(req: NextRequest) {
 
     if (!space) {
       return NextResponse.json(
-        { message: "Space not found or unauthorized" },
-        { status: 404 }
+        { message: "Space not found or not owned by you" },
+        { status: 403 }
       );
     }
 

@@ -1,12 +1,17 @@
 "use client";
 
+import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 interface LeftPanelProps {
   id: string;
-  summary: string[];
+  summary: Array<{
+    type: 'heading' | 'paragraph' | 'list_item';
+    level?: number;
+    content: string;
+  }>;
   title: string;
 }
 
@@ -19,6 +24,79 @@ export default function LeftPanel({
 
   const handleBack = () => {
     router.back();
+  };
+
+  // Render summary section based on type and level
+  const renderSummarySection = (section: {
+    type: 'heading' | 'paragraph' | 'list_item';
+    level?: number;
+    content: string;
+  }) => {
+    const { type, level, content } = section;
+    
+    switch (type) {
+      case 'heading':
+        // Handle headings based on level
+        if (level === 1) {
+          return (
+            <h1 className="text-xl font-bold text-[#5B4B8A] dark:text-white mt-4 mb-2">
+              {content}
+            </h1>
+          );
+        } else if (level === 2) {
+          return (
+            <h2 className="text-lg font-bold text-[#5B4B8A] dark:text-white mt-4 mb-2">
+              {content}
+            </h2>
+          );
+        } else if (level === 3) {
+          return (
+            <h3 className="text-base font-semibold text-[#4A3E78] dark:text-gray-200 mt-3 mb-1">
+              {content}
+            </h3>
+          );
+        } else {
+          // Default heading style
+          return (
+            <h4 className="text-sm font-semibold text-[#4A3E78] dark:text-gray-200 mt-3 mb-1">
+              {content}
+            </h4>
+          );
+        }
+        
+      case 'list_item':
+        return (
+          <li className="text-gray-700 dark:text-gray-300 leading-relaxed my-1 ml-6 list-disc">
+            {content}
+          </li>
+        );
+        
+      case 'paragraph':
+      default:
+        // Check if paragraph has bold content with **text** pattern
+        if (content.match(/\*\*.*?\*\*/)) {
+          // Text with bolded sections using **text**
+          const parts = content.split(/(\*\*.*?\*\*)/g);
+          return (
+            <p className="text-gray-700 dark:text-gray-300 leading-relaxed my-1">
+              {parts.map((part, i) => {
+                if (part.startsWith('**') && part.endsWith('**')) {
+                  // Bold text
+                  return <span key={i} className="font-semibold">{part.slice(2, -2)}</span>;
+                }
+                return part;
+              })}
+            </p>
+          );
+        } else {
+          // Regular paragraph
+          return (
+            <p className="text-gray-700 dark:text-gray-300 leading-relaxed my-1">
+              {content}
+            </p>
+          );
+        }
+    }
   };
 
   return (
@@ -37,16 +115,16 @@ export default function LeftPanel({
       </div>
 
       {/* Summary Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div className="p-6">
-          <h2 className="text-xl font-semibold mb-4 text-[#5B4B8A] dark:text-white">{title}</h2>
-          <div className="prose dark:prose-invert max-w-none">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden mx-4 my-4">
+        <div className="p-4">
+          <h2 className="text-xl font-semibold mb-3 text-[#5B4B8A] dark:text-white">{title}</h2>
+          <div className="prose dark:prose-invert max-w-none px-2">
             {summary && summary.length > 0 ? (
-              <div className="space-y-4">
-                {summary.map((paragraph, idx) => (
-                  <p key={idx} className="text-gray-700 dark:text-gray-300">
-                    {paragraph}
-                  </p>
+              <div className="space-y-1">
+                {summary.map((section, idx) => (
+                  <React.Fragment key={idx}>
+                    {renderSummarySection(section)}
+                  </React.Fragment>
                 ))}
               </div>
             ) : (

@@ -11,6 +11,7 @@ export async function authenticateUser(req: NextRequest) {
   try {
     // Get token from authorization header (case-insensitive)
     const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
+    
     let token = "";
     
     // Handle both formats: "Bearer token" or just "token"
@@ -65,16 +66,65 @@ export async function authenticateUser(req: NextRequest) {
  */
 export async function checkContentAccess(userId: string, contentId: string) {
   try {
-    const userContentExist = await prisma.userContent.findUnique({
-      where: {
-        user_id_content_id: {
-          user_id: userId,
-          content_id: contentId
+    // First, check if the content exists
+    const content = await prisma.content.findUnique({
+      where: { content_id: contentId },
+      include: {
+        users: {
+          where: { user_id: userId },
+          select: { user_id: true }
+        },
+        spaces: {
+          where: {
+            space: {
+              user_id: userId
+            }
+          },
+          select: { space_id: true }
+        }
+      }
+    });
+
+    if (!content) {
+      console.error(`Content not found: ${contentId}`);
+      return false;
+    }
+
+    // Check if user has direct access
+    if (content.users.length > 0) {
+      return true;
+    }
+
+    // Check if user has access through a space
+    if (content.spaces.length > 0) {
+      return true;
+    }
+
+    console.error(`User ${userId} does not have access to content ${contentId}`);
+    
+    // For debugging - log user's accessible content
+    const userContents = await prisma.userContent.findMany({
+      where: { user_id: userId },
+      select: { content_id: true }
+    });
+    
+    const userSpaces = await prisma.space.findMany({
+      where: { user_id: userId },
+      include: {
+        contents: {
+          select: { content_id: true }
         }
       }
     });
     
-    return !!userContentExist;
+    const spaceContentIds = userSpaces.flatMap(space => 
+      space.contents.map(c => c.content_id)
+    );
+    
+    console.log(`User ${userId} has direct access to:`, userContents.map(uc => uc.content_id));
+    console.log(`User ${userId} has access through spaces to:`, spaceContentIds);
+    
+    return false;
   } catch (error) {
     console.error("Error checking content access:", error);
     return false;

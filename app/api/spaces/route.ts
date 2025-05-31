@@ -1,25 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
+import { authenticateUser } from "@/lib/auth-helpers";
 
 export async function GET(req: NextRequest) {
   try {
-    // 1) Get token from Authorization: Bearer <token>
-    const authHeader = req.headers.get("Authorization") || "";
-    const token = authHeader.split(" ")[1];
-    if (!token) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    // 1) Authenticate user with centralized helper
+    const { user, error } = await authenticateUser(req);
+    if (error) {
+      return error;
     }
 
-    // 2) Verify JWT
-    const payload = await verifyJwtToken(token, process.env.JWT_SECRET!);
-    const userId = payload?.user_id;
-    if (!userId) {
-      return NextResponse.json(
-        { message: "Invalid token: missing user_id" },
-        { status: 401 }
-      );
-    }
+    const userId = user.user_id;
 
     // 3) Fetch all spaces belonging to this user, including their contents
     const userSpaces = await prisma.space.findMany({
@@ -83,21 +74,13 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const authHeader = req.headers.get("Authorization") || "";
-    const token = authHeader.split(" ")[1];
-    if (!token) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    // Authenticate user with centralized helper
+    const { user, error } = await authenticateUser(req);
+    if (error) {
+      return error;
     }
 
-    // Verify token
-    const payload = await verifyJwtToken(token, process.env.JWT_SECRET!);
-    const userId = payload?.user_id;
-    if (!userId) {
-      return NextResponse.json(
-        { message: "Invalid token: missing user_id" },
-        { status: 401 }
-      );
-    }
+    const userId = user.user_id;
 
     // Read JSON body
     const { name } = await req.json();

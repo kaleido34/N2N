@@ -75,26 +75,37 @@ export async function GET(req: NextRequest) {
                 if (!content.youtubeContent?.transcript) {
                     return NextResponse.json({ message: "No transcript found for this video" }, { status: 404 });
                 }
-                const transcripts = (content.youtubeContent.transcript as any[]).map(chunk => chunk.text);
-                transcriptText = transcripts.join(" ");
+                // Handle different transcript formats
+                if (Array.isArray(content.youtubeContent.transcript)) {
+                    const transcripts = content.youtubeContent.transcript
+                        .filter((chunk): chunk is { text: string } => 
+                            typeof chunk === 'object' && chunk !== null && 'text' in chunk
+                        )
+                        .map(chunk => chunk.text);
+                    transcriptText = transcripts.join(" ").trim();
+                } else {
+                    transcriptText = String(content.youtubeContent.transcript);
+                }
                 break;
                 
             case "DOCUMENT_CONTENT":
-                if (!content.documentContent?.text) {
-                    return NextResponse.json({ message: "No text found for this document" }, { status: 404 });
+                if (!content.documentContent) {
+                    return NextResponse.json({ message: "No document content found" }, { status: 404 });
                 }
-                transcriptText = content.documentContent.text;
+                const docContent = content.documentContent as { text?: unknown };
+                transcriptText = docContent.text ? String(docContent.text) : "";
                 break;
                 
             case "AUDIO_CONTENT":
                 if (!content.audioContent?.transcript) {
                     return NextResponse.json({ message: "No transcript found for this audio" }, { status: 404 });
                 }
-                // Extract full text from segments if available
-                if (typeof content.audioContent.transcript === 'object' && content.audioContent.transcript.text) {
-                    transcriptText = content.audioContent.transcript.text;
+                // Handle different transcript formats
+                const audioTranscript = content.audioContent.transcript;
+                if (typeof audioTranscript === 'object' && audioTranscript !== null && 'text' in audioTranscript) {
+                    transcriptText = String((audioTranscript as { text: unknown }).text || "");
                 } else {
-                    transcriptText = JSON.stringify(content.audioContent.transcript);
+                    transcriptText = JSON.stringify(audioTranscript);
                 }
                 break;
                 
@@ -109,30 +120,21 @@ export async function GET(req: NextRequest) {
                 return NextResponse.json({ message: "Unsupported content type" }, { status: 400 });
         }
 
-        // Generate quiz
-        const quiz = await generateQuiz(transcriptText);
+        // Generate quiz - no need to parse as generateQuiz now returns the parsed object
+        const { quiz } = await generateQuiz(transcriptText);
         if (!quiz) {
             return NextResponse.json({ message: "Could not generate quiz" }, { status: 500 });
-        }
-
-        // Clean and parse quiz JSON
-        const cleanedQuiz = quiz.replace(/```json\n|```/g, '');
-        let quizJson;
-        try {
-            quizJson = JSON.parse(cleanedQuiz);
-        } catch (parseError) {
-            return NextResponse.json({ message: "Invalid quiz format!" }, { status: 500 });
         }
 
         // Save the quiz in metadata
         await prisma.metadata.update({
             where: { content_id: content_id },
-            data: { quiz: quizJson }
+            data: { quiz: quiz }
         });
 
         return NextResponse.json({
             message: `Successfully created quiz for content_id: ${content_id}`,
-            data: quizJson
+            data: quiz
         });
     } catch (error) {
         return NextResponse.json({ message: "Error while generating quiz content!" }, { status: 500 });
@@ -171,36 +173,19 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Generate quiz from text
-        const quiz = await generateQuiz(text);
-        if (!quiz) {
-            return NextResponse.json(
-                { message: "Could not generate quiz" },
-                { status: 500 }
-            );
-        }
-
-        // Clean and parse quiz JSON
-        const cleanedQuiz = quiz.replace(/```json\n|```/g, '');
-        let quizJson;
-        
-        try {
-            quizJson = JSON.parse(cleanedQuiz);
-        } catch (parseError) {
-            console.error("Error parsing quiz JSON:", parseError);
-            return NextResponse.json(
-                { message: "Invalid quiz format!" },
-                { status: 500 }
-            );
-        }
+        // Generate quiz - no need to parse as generateQuiz now returns the parsed object
+        const { quiz } = await generateQuiz(text);
 
         // Save the quiz in metadata
         await prisma.metadata.upsert({
             where: { content_id },
-            update: { quiz: quizJson },
+            update: { 
+                quiz: quiz,
+                updated_at: new Date() 
+            },
             create: {
                 content_id,
-                quiz: quizJson,
+                quiz: quiz,
                 created_at: new Date(),
                 updated_at: new Date()
             }
@@ -208,7 +193,7 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({
             message: `Successfully created quiz for content_id: ${content_id}`,
-            data: quizJson
+            data: quiz
         });
     } catch (error) {
         console.error("Error in quiz generation:", error);

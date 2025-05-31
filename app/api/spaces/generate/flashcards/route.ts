@@ -62,20 +62,28 @@ export async function GET(req: NextRequest) {
             // For YouTube content, use transcript
             const transcript = content.youtubeContent.transcript;
             if (Array.isArray(transcript)) {
-                fullText = transcript.map(item => item.text).join(" ");
+                fullText = transcript
+                    .filter((item): item is { text: string } => 
+                        typeof item === 'object' && item !== null && 'text' in item && typeof item.text === 'string'
+                    )
+                    .map(item => item.text)
+                    .join(" ")
+                    .trim();
             }
         } else if (content.content_type === "DOCUMENT_CONTENT" && content.documentContent) {
             // For document content, use text
-            fullText = content.documentContent.text || "";
+            const docContent = content.documentContent as { text?: string };
+            fullText = docContent.text || "";
         } else if (content.content_type === "AUDIO_CONTENT" && content.audioContent) {
             // For audio content, use transcript text
-            const transcript = content.audioContent.transcript;
-            if (transcript && transcript.text) {
-                fullText = transcript.text;
+            const audioContent = content.audioContent as { transcript?: { text?: string } };
+            if (audioContent.transcript?.text) {
+                fullText = audioContent.transcript.text;
             }
         } else if (content.content_type === "IMAGE_CONTENT" && content.imageContent) {
             // For image content, use extracted text
-            fullText = content.imageContent.text || "";
+            const imgContent = content.imageContent as { text?: string };
+            fullText = imgContent.text || "";
         }
 
         if (!fullText) {
@@ -85,14 +93,16 @@ export async function GET(req: NextRequest) {
             );
         }
 
-        // Generate flashcards
-        const flashcardsData = await generateFlashCards(fullText);
-        const flashcards = JSON.parse(flashcardsData);
+        // Generate flashcards - no need to parse as generateFlashCards now returns the parsed object
+        const { flashcards } = await generateFlashCards(fullText);
 
         // Save flashcards to metadata
         await prisma.metadata.upsert({
             where: { content_id: content_id },
-            update: { flashcards: flashcards },
+            update: { 
+              flashcards: flashcards,
+              updated_at: new Date() 
+            },
             create: {
                 content_id: content_id,
                 flashcards: flashcards,

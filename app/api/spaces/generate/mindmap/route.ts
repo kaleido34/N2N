@@ -55,27 +55,33 @@ export async function GET(req: NextRequest) {
             });
         }
 
-        // If not, generate mindmap based on content type
+        // Get full transcript based on content type
         let fullTranscript = "";
 
         if (content.content_type === "YOUTUBE_CONTENT" && content.youtubeContent) {
             // For YouTube content, use transcript
             const transcript = content.youtubeContent.transcript;
             if (Array.isArray(transcript)) {
-                fullTranscript = transcript.map((item: any) => item.text).join(" ");
+                fullTranscript = transcript
+                    .filter((item): item is { text: string } => 
+                        typeof item === 'object' && item !== null && 'text' in item && typeof item.text === 'string'
+                    )
+                    .map(item => item.text)
+                    .join(" ")
+                    .trim();
             }
         } else if (content.content_type === "DOCUMENT_CONTENT" && content.documentContent) {
             // For document content, use text
-            fullTranscript = content.documentContent.text || "";
+            fullTranscript = (content.documentContent as { text?: string }).text || "";
         } else if (content.content_type === "AUDIO_CONTENT" && content.audioContent) {
             // For audio content, use transcript text
-            const transcript = content.audioContent.transcript;
-            if (transcript && transcript.text) {
+            const transcript = (content.audioContent as { transcript?: { text?: string } }).transcript;
+            if (transcript?.text) {
                 fullTranscript = transcript.text;
             }
         } else if (content.content_type === "IMAGE_CONTENT" && content.imageContent) {
             // For image content, use extracted text
-            fullTranscript = content.imageContent.text || "";
+            fullTranscript = (content.imageContent as { text?: string }).text || "";
         }
 
         if (!fullTranscript) {
@@ -85,24 +91,22 @@ export async function GET(req: NextRequest) {
             );
         }
 
-        // Generate mindmap
-        const mindMap = await generateMindMap(fullTranscript);
-        const mindMapData = JSON.parse(mindMap);
+        // Generate mindmap - no need to parse as generateMindMap now returns the parsed object
+        const mindMapData = await generateMindMap(fullTranscript);
 
-        // Save mindmap to metadata
+        // Save the mindmap to metadata
         await prisma.metadata.upsert({
-            where: { content_id: content_id },
-            update: { mindmap: mindMapData },
-            create: {
-                content_id: content_id,
-                mindmap: mindMapData,
-                created_at: new Date(),
-                updated_at: new Date()
-            }
+          where: { content_id },
+          update: { mindmap: mindMapData },
+          create: {
+            metadata_id: uuid(),
+            content_id,
+            mindmap: mindMapData
+          }
         });
 
         return NextResponse.json({
-            data: mindMapData
+          data: mindMapData
         });
     } catch (error) {
         console.error("Error generating mindmap:", error);

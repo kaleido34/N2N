@@ -1,39 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import jwt from "jsonwebtoken";
+import { authenticateUser, checkContentAccess } from "@/lib/auth-helpers";
 
 export async function DELETE(req: NextRequest, { params }: { params: { contentId: string } }) {
   const { contentId } = params;
-  // 1. Authenticate user
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader) {
-    return NextResponse.json({ error: "Missing Authorization header" }, { status: 401 });
+  
+  // 1. Authenticate user with centralized helper
+  const { user, error } = await authenticateUser(req);
+  if (error) {
+    return error;
   }
-  let userId: string | undefined;
-  try {
-    const token = authHeader.replace("Bearer ", "");
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
-    userId = (decoded as any).user_id;
-  } catch (err) {
-    return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-  }
-  // 2. Check if content exists and belongs to user
-  const userContent = await prisma.userContent.findUnique({
-    where: {
-      user_id_content_id: {
-        user_id: userId!,
-        content_id: contentId,
-      },
-    },
-  });
-  if (!userContent) {
-    return NextResponse.json({ error: "Content not found or not owned by user" }, { status: 404 });
+  
+  // 2. Check if user has access to this content
+  const hasAccess = await checkContentAccess(user.user_id, contentId);
+  if (!hasAccess) {
+    return NextResponse.json({ error: "Content not found or not accessible" }, { status: 403 });
   }
   // 3. Delete the user-content link (and optionally the content if no one else owns it)
   await prisma.userContent.delete({
     where: {
       user_id_content_id: {
-        user_id: userId!,
+        user_id: user.user_id,
         content_id: contentId,
       },
     },

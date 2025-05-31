@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcrypt";
-import { verifyJwtToken } from "@/lib/jwt";
+import { authenticateUser } from "@/lib/auth-helpers";
 
 export async function PUT(req: NextRequest) {
   try {
@@ -30,20 +30,14 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    // 3) Retrieve JWT from Authorization header
-    //    (If you have global middleware, it may already fail before here if missing or invalid.)
-    const authHeader = req.headers.get("Authorization") || "";
-    const token = authHeader.split(" ")[1];
-
-    if (!token) {
-      return NextResponse.json({ message: "Token missing" }, { status: 401 });
+    // 3) Authenticate user with centralized helper
+    const { user: authUser, error } = await authenticateUser(req);
+    if (error) {
+      return error;
     }
 
-    // 4) Verify token
-    const payload = await verifyJwtToken(token, process.env.JWT_SECRET!);
-
     // Ensure the user in the token matches the user being updated
-    if (payload?.user_id !== userId) {
+    if (authUser.user_id !== userId) {
       return NextResponse.json(
         { message: "Unauthorized: Token does not match user" },
         { status: 403 }

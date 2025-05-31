@@ -124,22 +124,20 @@ export async function GET(req: NextRequest) {
       // Generate TTS URL
       const audioUrl = await googleTTS(summaryText, 'en', 1);
       
-      // Store the audio URL in metadata
-      if (existingMetadata) {
-        await prisma.metadata.update({
-          where: { content_id: content_id },
-          data: { audio_summary: audioUrl }
-        });
-      } else {
-        await prisma.metadata.create({
-          data: {
-            content_id: content_id,
-            audio_summary: audioUrl,
-            created_at: new Date(),
-            updated_at: new Date()
-          }
-        });
-      }
+      // Store the audio URL in metadata using upsert to handle both create and update cases
+      await prisma.metadata.upsert({
+        where: { content_id: content_id },
+        update: { 
+          audio_summary: audioUrl,
+          updated_at: new Date() 
+        },
+        create: {
+          content_id: content_id,
+          audio_summary: audioUrl,
+          created_at: new Date(),
+          updated_at: new Date()
+        }
+      });
       
       // Return the audio URL and summary text
       return NextResponse.json({

@@ -2,38 +2,31 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { summarizeChunks } from "@/lib/utils";
 import { v4 as uuid } from "uuid";
-import { verifyJwtToken } from "@/lib/jwt"; // ✅ Import verifier
+import { authenticateUser, checkContentAccess } from "@/lib/auth-helpers";
+
+// Import parseAiResponse helper
+const aiUtils = import('@/lib/ai-utils').then(module => module.parseAiResponse);
 
 export async function GET(req: NextRequest) {
     try {
         const params = req.nextUrl.searchParams;
         const content_id = params.get("content_id");
+        const force = params.get("force") === "true";
 
-        let token = req.headers.get("authorization") || req.headers.get("Authorization");
-        if (!token) {
-            return NextResponse.json({ message: "Missing authorization token." }, { status: 401 });
-        }
-        if (token.startsWith("Bearer ")) token = token.slice(7);
-        const user = await verifyJwtToken(token, process.env.JWT_SECRET!);
-        if (!user || !user.user_id) {
-            return NextResponse.json({ message: "Invalid or expired token." }, { status: 403 });
+        // Authenticate user with centralized helper
+        const { user, error } = await authenticateUser(req);
+        if (error) {
+            return error;
         }
 
         if (!content_id) {
-            return NextResponse.json({ message: "Please provide content_id!" }, { status: 403 });
+            return NextResponse.json({ message: "Please provide content_id!" }, { status: 400 });
         }
 
-        const userContentExist = await prisma.userContent.findUnique({
-            where: {
-                user_id_content_id: {
-                    user_id: user.user_id,
-                    content_id: content_id
-                }
-            }
-        });
-
-        if (!userContentExist) {
-            return NextResponse.json({ message: "Content not found for the user!" }, { status: 401 });
+        // Check if user has access to this content
+        const hasAccess = await checkContentAccess(user.user_id, content_id);
+        if (!hasAccess) {
+            return NextResponse.json({ message: "Content not found or not accessible" }, { status: 403 });
         }
 
         // First check if we already have metadata with summary for this content
@@ -41,7 +34,8 @@ export async function GET(req: NextRequest) {
             where: { content_id: content_id }
         });
 
-        if (existingMetadata?.summary) {
+        // Return existing summary unless force regeneration is requested
+        if (existingMetadata?.summary && !force) {
             return NextResponse.json({
                 message: "Found summary successfully!",
                 data: existingMetadata.summary
@@ -98,8 +92,11 @@ export async function GET(req: NextRequest) {
                     return NextResponse.json({ message: "No transcript found for this audio" }, { status: 404 });
                 }
                 // Extract full text from segments if available
-                if (typeof content.audioContent.transcript === 'object' && content.audioContent.transcript.text) {
-                    transcriptText = content.audioContent.transcript.text;
+                // Type safe handling of transcript which could be various formats
+                if (typeof content.audioContent.transcript === 'object' && 
+                    content.audioContent.transcript !== null && 
+                    'text' in content.audioContent.transcript) {
+                    transcriptText = (content.audioContent.transcript as any).text;
                 } else {
                     transcriptText = JSON.stringify(content.audioContent.transcript);
                 }
@@ -117,21 +114,44 @@ export async function GET(req: NextRequest) {
         }
 
         // Generate summary
-        const summary = await summarizeChunks(transcriptText);
-        if (!summary) {
+        const summaryText = await summarizeChunks(transcriptText);
+        if (!summaryText) {
             return NextResponse.json({ message: "Could not generate summary" }, { status: 500 });
         }
-
-        // Save the summary in metadata
-        await prisma.metadata.update({
-            where: { content_id: content_id },
-            data: { summary }
-        });
-
-        return NextResponse.json({
-            message: `Successfully created summary for content_id: ${content_id}`,
-            data: summary
-        });
+        
+        // Parse the JSON summary
+        let parsedSummary;
+        try {
+            // Import the parseAiResponse helper dynamically
+            const parseAiResponse = await import('@/lib/ai-utils').then(module => module.parseAiResponse);
+            
+            // Parse the summary text to get the structured data
+            parsedSummary = parseAiResponse(summaryText);
+            
+            // Save the original JSON string in metadata (for backward compatibility)
+            await prisma.metadata.update({
+                where: { content_id: content_id },
+                data: { summary: summaryText }
+            });
+            
+            return NextResponse.json({
+                message: `Successfully created summary for content_id: ${content_id}`,
+                data: parsedSummary
+            });
+        } catch (parseError) {
+            console.error("Error parsing summary JSON:", parseError);
+            
+            // If JSON parsing fails, save and return as-is (fallback to the old behavior)
+            await prisma.metadata.update({
+                where: { content_id: content_id },
+                data: { summary: summaryText }
+            });
+            
+            return NextResponse.json({
+                message: `Successfully created summary for content_id: ${content_id}`,
+                data: summaryText
+            });
+        }
         
 
     } catch (error) {
@@ -142,42 +162,51 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
     try {
-        let token = req.headers.get("authorization") || req.headers.get("Authorization");
-        if (!token) {
-            return NextResponse.json({ message: "Missing authorization token." }, { status: 401 });
+        // Authenticate user with centralized helper
+        const { user, error } = await authenticateUser(req);
+        if (error) {
+            return error;
         }
-        if (token.startsWith("Bearer ")) token = token.slice(7);
-        const user = await verifyJwtToken(token, process.env.JWT_SECRET!);
-        if (!user || !user.user_id) {
-            return NextResponse.json({ message: "Invalid or expired token." }, { status: 403 });
-        }
+        
         const body = await req.json();
         const { text, video_id, content_id } = body;
         if (!content_id) {
-            return NextResponse.json({ message: "Please provide content_id!" }, { status: 403 });
+            return NextResponse.json({ message: "Please provide content_id!" }, { status: 400 });
         }
-        // Check user-content relation
-        const userContentExist = await prisma.userContent.findUnique({
-            where: {
-                user_id_content_id: {
-                    user_id: user.user_id,
-                    content_id: content_id
-                }
-            }
-        });
-        if (!userContentExist) {
-            return NextResponse.json({ message: "Content not found for the user!" }, { status: 401 });
+        
+        // Check if user has access to this content
+        const hasAccess = await checkContentAccess(user.user_id, content_id);
+        if (!hasAccess) {
+            return NextResponse.json({ message: "Content not found or not accessible" }, { status: 403 });
         }
         if (text) {
             // Document lesson: generate summary from text
-            const summary = await summarizeChunks(text);
-            if (!summary) {
+            const summaryText = await summarizeChunks(text);
+            if (!summaryText) {
                 return NextResponse.json({ message: "Could not generate summary" }, { status: 500 });
             }
-            return NextResponse.json({
-                message: `Successfully created summary for content_id: ${content_id} (document lesson)` ,
-                data: summary
-            });
+            
+            // Parse the JSON summary
+            try {
+                // Import the parseAiResponse helper dynamically
+                const parseAiResponse = await import('@/lib/ai-utils').then(module => module.parseAiResponse);
+                
+                // Parse the summary text to get the structured data
+                const parsedSummary = parseAiResponse(summaryText);
+                
+                return NextResponse.json({
+                    message: `Successfully created summary for content_id: ${content_id} (document lesson)` ,
+                    data: parsedSummary
+                });
+            } catch (parseError) {
+                console.error("Error parsing summary JSON:", parseError);
+                
+                // If JSON parsing fails, return as-is (fallback to the old behavior)
+                return NextResponse.json({
+                    message: `Successfully created summary for content_id: ${content_id} (document lesson)` ,
+                    data: summaryText
+                });
+            }
         } else if (video_id) {
             // ... existing video logic (copy from GET handler if needed) ...
             // For now, just return an error if not implemented

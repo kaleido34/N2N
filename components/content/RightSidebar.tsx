@@ -156,7 +156,7 @@ export default function RightSidebar({
       </div>
 
       {/* Footer (absolute bottom) */}
-      <div className="w-full flex items-center justify-between px-4 py-3 border-t border-sidebar-border bg-[#FAF7F8] dark:bg-[#18132A]/80 absolute bottom-0 left-0">
+      <div className="w-full flex items-center justify-between px-4 py-3 border-t border-b border-sidebar-border bg-[#FAF7F8] dark:bg-[#18132A]/80 absolute bottom-0 left-0">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Avatar className="h-9 w-9 cursor-pointer shadow-sm hover:shadow-md transition-all duration-200">

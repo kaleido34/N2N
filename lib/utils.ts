@@ -28,9 +28,11 @@ export interface MindMapNode {
   category?: string;
 }
 
-export interface MindMapData {
+export interface MindMapData extends Record<string, any> {
   nodes: MindMapNode[];
   links: { from: number; to: number }[];
+  from: number;
+  to: number;
 }
 
 export function cn(...inputs: ClassValue[]) {
@@ -213,160 +215,143 @@ export const preprocessTranscript = async (
 };
 
 export const summarizeChunks = async (transcripts: string) => {
-    const prompt = `You are an expert content analyzer and summarizer specializing in creating comprehensive, well-structured summaries from diverse educational materials. Your task is to create a detailed summary that transforms any learning content into an informative, accessible format optimized for student comprehension and retention.
-Content Adaptation Guidelines
-For Video Transcripts:
+    const prompt = `You are an expert content analyzer specializing in creating concise, well-structured summaries from diverse educational materials. Your task is to create a comprehensive overview that transforms any learning content into an accessible format optimized for quick understanding.
+IMPORTANT: Return ONLY valid JSON without any markdown formatting or additional text. Do not include code blocks or backticks. The response must be valid JSON that can be parsed with JSON.parse().
+Summary Requirements
+Target Specifications
 
-Focus on the logical flow of presented information
-Identify verbal emphasis and repeated concepts as key points
-Extract examples and demonstrations mentioned
-Note any visual elements referenced in speech
+Word Count: 600-700 words total
+Format: Clean overview suitable for content page display
+Audience: General learners seeking quick but comprehensive understanding
+Tone: Professional, clear, and accessible
 
-For PDF Documents:
+Content Structure
+Create a streamlined summary with content-driven sections:
 
-Prioritize headings, subheadings, and structured content
-Extract information from tables, charts, and diagrams when mentioned
-Identify key concepts from academic or technical language
-Maintain the document's hierarchical information structure
+Introduction (100-120 words) - NO HEADING
 
-For Image Content:
+Main subject and purpose
+Key learning objectives
+Context and relevance
 
-Analyze visual elements, diagrams, charts, and infographics
-Extract text from images and integrate with visual context
-Identify relationships shown through visual connections
-Describe processes or workflows illustrated visually
 
-For Audio Files:
+Dynamic Section Headings (400-450 words total across 2-3 sections)
 
-Capture spoken emphasis, tone changes, and repetition patterns
-Identify structural markers like "first," "next," "finally"
-Extract examples, anecdotes, and case studies
-Note any background context or environmental audio cues
+Create headings based on the actual content topics
+Examples: "Machine Learning Fundamentals," "Data Analysis Techniques," "Financial Planning Strategies"
+Adapt headings to match the specific subject matter
+Include fundamental principles, key concepts, and practical applications
 
-Summary Structure Framework
-1. Content Overview (2-3 sentences)
 
-Purpose: Establish the main subject and learning objectives
-Scope: Define what the content covers and its intended audience
-Context: Provide brief background or prerequisite knowledge needed
-Value Proposition: Highlight the primary benefit or takeaway for learners
+Key Insights (100-120 words)
 
-2. Foundational Concepts (150-200 words)
+Most important takeaways
+Actionable recommendations
+Practical applications
 
-Core Definitions: List and explain essential terms and concepts
-Background Knowledge: Provide necessary context for understanding
-Prerequisite Skills: Identify what learners should know beforehand
-Conceptual Framework: Establish how different ideas connect
 
-3. Main Content Analysis
-3a. Primary Topics (200-250 words)
 
-Topic Hierarchy: Organize content from fundamental to advanced
-Learning Progression: Show how concepts build upon each other
-Critical Connections: Highlight relationships between different topics
-Depth Indicators: Specify which topics receive detailed treatment
+Required JSON Structure
+Structure your response exactly as follows:
+{
+  "sections": [
+    {
+      "type": "paragraph",
+      "content": "Introduction paragraph content - no heading needed"
+    },
+    {
+      "type": "heading", 
+      "level": 2,
+      "content": "Content-Specific Heading Based on Transcript Topic"
+    },
+    {
+      "type": "paragraph",
+      "content": "Content explaining the specific topic from transcript"
+    },
+    {
+      "type": "list_item",
+      "content": "Key point related to this topic"
+    },
+    {
+      "type": "heading",
+      "level": 2, 
+      "content": "Another Topic-Specific Heading from Content"
+    },
+    {
+      "type": "paragraph",
+      "content": "More content based on actual transcript material"
+    },
+    {
+      "type": "heading",
+      "level": 2,
+      "content": "Key Insights"  
+    },
+    {
+      "type": "paragraph",
+      "content": "Important takeaways and actionable insights"
+    },
+    {
+      "type": "list_item",
+      "content": "Specific actionable takeaway"
+    }
+  ]
+}
+  
+Content Guidelines
+What to Include
 
-3b. Key Insights & Examples (150-200 words)
+Essential Information: Core concepts, key principles, and main topics from the content
+Content-Driven Headings: Section titles that reflect the actual subject matter discussed
+Practical Value: Real-world applications and actionable insights
+Learning Focus: What readers will understand and be able to do
+Clear Explanations: Technical terms defined simply
+Concrete Examples: Specific illustrations from the source material
 
-Practical Applications: Real-world use cases and implementations
-Case Studies: Detailed examples that illustrate concepts
-Problem-Solution Patterns: Common challenges and their solutions
-Best Practices: Recommended approaches and methodologies
+What to Exclude
 
-4. Technical & Methodological Details
-4a. Tools & Technologies (if applicable)
+Source-specific references ("In this video," "The document explains")
+Excessive technical jargon without explanation
+Repetitive or filler content
+Complex subsections or nested hierarchies
+Promotional language or unnecessary details
 
-Software/Hardware: Specific tools mentioned or demonstrated
-Platforms & Systems: Technical environments discussed
-Version Information: Specific versions or configurations noted
-Alternative Options: Substitute tools or approaches mentioned
+Writing Standards
 
-4b. Processes & Procedures
+Clarity: Simple, direct sentences that communicate effectively
+Conciseness: Every sentence adds value without redundancy
+Accessibility: Understandable by diverse learning backgrounds
+Completeness: Cover all essential information within word limit
+Flow: Logical progression from overview to specific details
 
-Step-by-Step Methods: Detailed procedural information
-Workflow Patterns: Standard approaches and sequences
-Quality Checkpoints: Verification and validation steps
-Troubleshooting Guidance: Common issues and solutions
+Element Types Usage
 
-5. Advanced Concepts & Extensions (100-150 words)
+"paragraph": Start with introduction paragraph (no heading)
+"heading" with level 2: Content-driven section headings based on transcript topics
 
-Complex Applications: Advanced use cases and scenarios
-Integration Possibilities: How content connects to other domains
-Future Developments: Emerging trends or upcoming changes
-Research Directions: Areas for further exploration
+Examples: "Digital Marketing Strategies," "Python Programming Basics," "Investment Portfolio Management"
+Create 2-3 headings that reflect the actual content themes
 
-6. Actionable Takeaways (100-120 words)
 
-Immediate Actions: What learners can do right away
-Skill Development Path: Sequential steps for improvement
-Practice Recommendations: Exercises or activities to reinforce learning
-Next Learning Steps: Suggested follow-up topics or resources
+"paragraph": Main explanatory content, definitions, and detailed information
+"list_item": Individual key points, takeaways, or important items (use sparingly for emphasis)
+Final heading: Always end with "Key Insights" section
 
-7. Learning Reinforcement
+Quality Standards
+Content Quality
 
-Key Principles: 3-5 fundamental rules or guidelines to remember
-Memory Anchors: Notable quotes, formulas, or memorable statements
-Common Pitfalls: Frequent mistakes to avoid
-Success Indicators: How to know you've mastered the content
+All major topics represented proportionally
+Technical accuracy maintained throughout
+Examples and applications clearly explained
+Practical value evident in every section
 
-Enhanced Formatting Standards
-Structure Requirements:
+Structural Quality
 
-Word Count: Target 600-800 words for comprehensive coverage
-Paragraph Limits: Maximum 4 sentences per paragraph for readability
-Section Balance: Distribute content proportionally across sections
-Logical Flow: Ensure smooth transitions between topics
+Clean JSON format with proper syntax
+Appropriate content distribution across sections
+Logical flow from general to specific information
+Consistent tone and style throughout
 
-Visual Organization:
-
-Heading Hierarchy: Use H1-H4 consistently for organization
-List Formatting: Employ bullet points, numbered lists, and sub-bullets
-Emphasis Patterns: Bold for key terms, italics for examples
-White Space: Strategic spacing for visual breathing room
-
-Content Enhancement:
-
-Specificity Focus: Include precise details, numbers, and measurements
-Context Preservation: Maintain original context while improving clarity
-Accessibility: Write for diverse learning styles and backgrounds
-Completeness: Ensure no critical information is omitted
-
-Quality Assurance Checklist
-Content Accuracy:
-
- All major topics from source material included
- Technical terms properly defined and explained
- Examples and case studies accurately represented
- Numerical data and statistics correctly transcribed
-
-Educational Value:
-
- Clear learning objectives evident
- Logical progression from basic to advanced concepts
- Practical applications clearly identified
- Actionable insights provided for immediate use
-
-Readability Standards:
-
- Professional yet accessible tone maintained
- Jargon explained without condescension
- Consistent formatting throughout
- Smooth transitions between sections
-
-Exclusion Guidelines:
-Do NOT include:
-
-Source-specific references ("In this video," "The PDF states," "The image shows")
-Timestamp or page number references
-Technical metadata or file information
-Repetitive content or unnecessary filler
-Promotional or marketing language
-Personal opinions or editorial commentary
-
-Final Output Requirements
-Deliver a polished, comprehensive summary that serves as a standalone learning resource. The summary should enable a reader to understand the core concepts, apply the knowledge practically, and identify areas for further learning—regardless of the original content format.
-Target Audience: Students, professionals, and lifelong learners seeking to master new concepts efficiently and thoroughly.
-Assessment Criteria: Content completeness, educational clarity, practical utility, and professional presentation.`;
+Generate a comprehensive yet concise summary that serves as an effective overview for any learning content, formatted as clean JSON ready for immediate use.`;
 
     const generateContent = await model.generateContent([prompt, transcripts]);
     return generateContent?.response?.text();
@@ -374,29 +359,46 @@ Assessment Criteria: Content completeness, educational clarity, practical utilit
 
 
 
-export const generateFlashCards = async (transcripts: string) => {
+interface Flashcard extends Record<string, any> {
+  question: string;
+  hint: string;
+  answer: string;
+  explanation: string;
+  source: string;
+}
+
+interface FlashcardResponse {
+  flashcards: Flashcard[];
+}
+
+export const generateFlashCards = async (transcripts: string): Promise<FlashcardResponse> => {
+    // Import the parseAiResponse helper
+    const { parseAiResponse } = await import('./ai-utils');
+    
     const prompt = `You are an expert educational content analyzer specializing in creating effective flashcards from diverse learning materials. Generate structured flashcards in JSON format from the provided content (video transcript, PDF, image, or audio).
+
+IMPORTANT: Return ONLY valid JSON without any markdown formatting or additional text. Do not include code blocks or backticks. The response must be valid JSON that can be parsed with JSON.parse().
+
 Flashcard Creation Guidelines
 Content Adaptation Rules:
-Video/Audio Transcripts: Use approximate timestamps (MM:SS format)
-PDF Documents: Use page numbers or section references (e.g., "Page 3", "Section 2.1")
-Images: Use "Image Analysis" or describe the visual element location
-General Content: Use "N/A" when no specific source reference applies
-Question Types to Create:
+- Video/Audio Transcripts: Use approximate timestamps (MM:SS format)
+- PDF Documents: Use page numbers or section references (e.g., "Page 3", "Section 2.1")
+- Images: Use "Image Analysis" or describe the visual element location
+- General Content: Use "N/A" when no specific source reference applies
 
-Factual Questions: Key definitions, terms, concepts
-Conceptual Questions: Understanding relationships and principles
-Application Questions: How to use or apply knowledge
-Process Questions: Step-by-step procedures or workflows
-Comparative Questions: Differences, similarities, pros/cons
+Question Types to Create:
+- Factual Questions: Key definitions, terms, concepts
+- Conceptual Questions: Understanding relationships and principles
+- Application Questions: How to use or apply knowledge
+- Process Questions: Step-by-step procedures or workflows
+- Comparative Questions: Differences, similarities, pros/cons
 
 Quality Standards:
-
-Question Clarity: Direct, unambiguous questions
-Strategic Hints: Provide context without revealing answers
-Precise Answers: Complete but concise responses
-Educational Explanations: Add context and deeper understanding
-Balanced Difficulty: Mix easy, medium, and challenging questions
+- Question Clarity: Direct, unambiguous questions
+- Strategic Hints: Provide context without revealing answers
+- Precise Answers: Complete but concise responses
+- Educational Explanations: Add context and deeper understanding
+- Balanced Difficulty: Mix easy, medium, and challenging questions
 
 Required JSON Structure:
 
@@ -440,66 +442,93 @@ Generate educational flashcards that promote active recall and deep understandin
 
   `;
     const generateContent = await model.generateContent([prompt, transcripts]);
-    return generateContent.response.text();
+    const responseText = generateContent.response.text();
+    
+    try {
+      // Parse the response using our helper function
+      const flashcardData = parseAiResponse<FlashcardResponse>(responseText);
+      return flashcardData;
+    } catch (error) {
+      console.error('Error parsing flashcard response:', error);
+      console.error('Raw response:', responseText);
+      throw new Error('Failed to generate flashcards. The AI response format was invalid.');
+    }
 };
 
-export const generateQuiz = async (transcripts: string) => {
+interface QuizQuestion extends Record<string, any> {
+  question: string;
+  options: string[];
+  correct_option: string;
+  explanation: string;
+  source_reference: string;
+  difficulty?: 'easy' | 'medium' | 'hard';
+  question_type?: 'factual' | 'conceptual' | 'application' | 'analysis';
+}
+
+interface QuizResponse {
+  quiz: QuizQuestion[];
+}
+
+export const generateQuiz = async (transcripts: string): Promise<QuizResponse> => {
+    // Import the parseAiResponse helper
+    const { parseAiResponse } = await import('./ai-utils');
+    
     const prompt = `Multi-Source Quiz Generation Prompt
-You are an expert educational assessment designer specializing in creating comprehensive multiple-choice quizzes from diverse learning materials. Analyze the provided content and generate meaningful quiz questions that test understanding, application, and retention.
-Content Adaptation Guidelines
-Video/Audio Transcripts: Use timestamps in MM:SS format and reference spoken content flow
-PDF Documents: Reference page numbers, sections, or chapters (e.g., "Page 5", "Section 3.1")
-Images: Reference visual elements, diagrams, or charts (e.g., "Diagram 2", "Chart Analysis")
-General Content: Use "Content Analysis" when no specific source reference applies
+
+You are an expert educational assessment designer specializing in creating comprehensive multiple-choice quizzes that test understanding, application, and retention of learning materials.
+
+IMPORTANT: Return ONLY valid JSON without any markdown formatting or additional text. Do not include code blocks or backticks. The response must be valid JSON that can be parsed with JSON.parse().
+
+CRITICAL: Generate questions as if they are standalone knowledge assessments. Never reference the source material directly using phrases like "In this video," "According to the document," "The material states," "As mentioned," or similar source-referential language. Questions should read as if they are testing established knowledge rather than content from a specific source.
 Quiz Generation Requirements
-Question Quantity:
+Question Quantity
 
-Minimum 10 questions for any content length
-12-15 questions for medium-length content (30-60 min videos, 10-20 page documents)
-15-20 questions for comprehensive content (60+ min videos, 20+ page documents)
-Scale proportionally based on content depth and complexity
+    Minimum 10 questions for any content length
+    12-15 questions for medium-length content
+    15-20 questions for comprehensive content
+    Scale proportionally based on content depth and complexity
 
-Question Types Distribution:
+Question Types Distribution
 
-Factual Questions (30%): Definitions, terms, specific facts
-Conceptual Questions (30%): Understanding principles and relationships
-Application Questions (25%): How to use knowledge in practice
-Analysis Questions (15%): Compare, contrast, evaluate concepts
+    Factual Questions (30%): Definitions, terms, specific facts
+    Conceptual Questions (30%): Understanding principles and relationships
+    Application Questions (25%): How to use knowledge in practice
+    Analysis Questions (15%): Compare, contrast, evaluate concepts
 
-Content Coverage Strategy:
+Content Coverage Strategy
 
-Topic Completeness: Cover ALL major topics and subtopics
-Balanced Distribution: Questions spread across entire content
-Key Concept Focus: Emphasize most important learning objectives
-Detail Hierarchy: Mix high-level concepts with specific details
+    Topic Completeness: Cover ALL major topics and subtopics
+    Balanced Distribution: Questions spread across entire content
+    Key Concept Focus: Emphasize most important learning objectives
+    Detail Hierarchy: Mix high-level concepts with specific details
 
 Question Quality Standards
-Question Construction:
+Question Construction
 
-Clear and Concise: Direct questions without ambiguity
-Appropriate Difficulty: Mix easy (40%), medium (40%), hard (20%) questions
-Relevant Context: Questions directly tied to source material
-Standalone Clarity: Questions understandable without external context
+    Clear and Concise: Direct questions without ambiguity
+    Appropriate Difficulty: Mix easy (40%), medium (40%), hard (20%) questions
+    Knowledge-Based Framing: Present questions as testing established knowledge
+    Standalone Clarity: Questions understandable without external context
 
-Option Design:
+Option Design
 
-One Clearly Correct Answer: Unambiguous right choice
-Plausible Distractors: Wrong options that seem reasonable
-Similar Length: All options roughly same word count
-No "All/None of the Above": Use specific, meaningful options
+    One Clearly Correct Answer: Unambiguous right choice
+    Plausible Distractors: Wrong options that seem reasonable
+    Similar Length: All options roughly same word count
+    No "All/None of the Above": Use specific, meaningful options
 
-Explanation Requirements:
+Explanation Requirements
 
-Concise but Complete: 1-2 sentences explaining why the answer is correct
-Source Integration: Reference where concept appears in material
-Learning Enhancement: Add context that deepens understanding
-Common Misconceptions: Address why wrong options might seem appealing
+    Concise but Complete: 1-2 sentences explaining why the answer is correct
+    Educational Context: Add context that deepens understanding
+    Knowledge Integration: Connect concepts without referencing source material
+    Common Misconceptions: Address why wrong options might seem appealing
 
 Required JSON Structure:
 {
   "questions": [
     {
-      "question": "Clear, well-framed question based on content",
+      "question": "Clear, well-framed question testing knowledge",
       "options": [
         "First answer option",
         "Second answer option", 
@@ -508,41 +537,72 @@ Required JSON Structure:
       ],
       "correct_option": "Exact match to one of the four options above",
       "explanation": "Concise explanation of correct answer with educational context",
-      "source_reference": "12:34 (video), Page 5 (PDF), Diagram 2 (image), or Content Analysis"
+      "source_reference": "Topic reference or content area identifier"
     }
   ]
 }
   
-Source Reference Format:
-Videos/Audio: "12:34" (timestamp format)
-PDFs: "Page 5" or "Section 3.2"
-Images: "Diagram 1", "Chart 3", or "Image Analysis"
-Multiple Sources: "Pages 5-7" or "15:30-18:45"
-General: "Content Analysis" when specific reference isn't applicable
-Quality Assurance Checklist:
+Source Reference Format
+Instead of referencing the source material directly, use topic-based references:
+
+Topic Areas: "Fundamentals," "Advanced Concepts," "Applications"
+Subject Categories: "Theory," "Practice," "Analysis"
+Content Sections: "Core Principles," "Case Studies," "Methods"
+Knowledge Domains: Relevant subject area or skill category
+
+Question Framing Examples
+❌ Avoid These Phrasings:
+
+"According to the video..."
+"In this document..."
+"The material explains..."
+"As mentioned in the content..."
+"The source states..."
+
+✅ Use These Phrasings Instead:
+
+"What is the primary purpose of..."
+"Which method is most effective for..."
+"How does X relate to Y..."
+"What are the key characteristics of..."
+"Which statement best describes..."
+
+Quality Assurance Checklist
 
  All major topics covered with appropriate question distribution
  Question difficulty appropriately varied across the quiz
  All options are plausible and grammatically consistent
+ No source-referential language used in questions
  Explanations enhance learning without being repetitive
- Source references are accurate and helpful
+ Source references use topic-based identifiers
  JSON format is valid and properly structured
 
-Advanced Question Techniques:
+Advanced Question Techniques
+
 Scenario-Based: Present realistic situations requiring knowledge application
 Sequential Logic: Questions that build on previous concepts
-Visual Integration: For image/diagram content, test visual interpretation
 Process Understanding: Test step-by-step procedures and workflows
 Critical Thinking: Questions requiring analysis and evaluation
-Generate a comprehensive quiz that effectively assesses learner understanding and promotes knowledge retention across all content areas.`;
+Knowledge Synthesis: Combine multiple concepts in single questions
 
+Generate a comprehensive quiz that effectively assesses learner understanding and promotes knowledge retention while maintaining the illusion that questions test established knowledge rather than specific source material.`;
 
 
     const generateContent = await model.generateContent([prompt, transcripts]);
-    return generateContent.response.text();
+    const responseText = generateContent.response.text();
+    
+    try {
+      // Parse the response using our helper function
+      const quizData = parseAiResponse<QuizResponse>(responseText);
+      return quizData;
+    } catch (error) {
+      console.error('Error parsing quiz response:', error);
+      console.error('Raw response:', responseText);
+      throw new Error('Failed to generate quiz. The AI response format was invalid.');
+    }
 };
 
-export const generateMindMap = async (transcripts: string) => {
+export const generateMindMap = async (transcripts: string): Promise<MindMapData> => {
   // Split transcript into chunks of approximately 1000 words
   const words = transcripts.split(' ');
   const chunks = [];
@@ -696,22 +756,38 @@ Target Output: A clean, balanced mind map JSON structure ready for immediate vis
 
 
 
+  // Import the parseAiResponse helper
+  const { parseAiResponse } = await import('./ai-utils');
+  
   // Process chunks sequentially
   let mindMapData: MindMapData | null = null;
-  for (const chunk of chunks) {
-    const generateContent = await model.generateContent([prompt, chunk]);
-    const chunkData: MindMapData = JSON.parse(generateContent.response.text());
+  
+  try {
+    for (const chunk of chunks) {
+      const generateContent = await model.generateContent([prompt, chunk]);
+      const responseText = generateContent.response.text();
+      
+      // Parse the response using our helper function
+      const chunkData = parseAiResponse<MindMapData>(responseText);
+      
+      if (!mindMapData) {
+        mindMapData = chunkData;
+      } else {
+        // Merge new nodes and links, avoiding duplicates
+        const existingKeys = new Set(mindMapData.nodes.map((n: MindMapNode) => n.key));
+        const newNodes = chunkData.nodes.filter((n: MindMapNode) => !existingKeys.has(n.key));
+        mindMapData.nodes.push(...newNodes);
+        mindMapData.links.push(...chunkData.links);
+      }
+    }
     
     if (!mindMapData) {
-      mindMapData = chunkData;
-    } else {
-      // Merge new nodes and links, avoiding duplicates
-      const existingKeys = new Set(mindMapData.nodes.map((n: MindMapNode) => n.key));
-      const newNodes = chunkData.nodes.filter((n: MindMapNode) => !existingKeys.has(n.key));
-      mindMapData.nodes.push(...newNodes);
-      mindMapData.links.push(...chunkData.links);
+      throw new Error('Failed to generate mind map data');
     }
+    
+    return mindMapData;
+  } catch (error) {
+    console.error('Error generating mind map:', error);
+    throw new Error('Failed to generate mind map. Please try again.');
   }
-
-  return JSON.stringify(mindMapData);
 };

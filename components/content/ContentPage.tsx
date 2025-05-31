@@ -7,6 +7,21 @@ import RightSidebar from "./RightSidebar";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import axios from "axios";
 
+interface SummaryResponse {
+  message: string;
+  data: string | any;
+}
+
+interface SummarySection {
+  type: 'heading' | 'paragraph' | 'list_item';
+  level?: number;
+  content: string;
+}
+
+interface SummaryData {
+  sections: SummarySection[];
+}
+
 interface ContentPageProps {
   id: string; // from useParams
 }
@@ -14,7 +29,7 @@ interface ContentPageProps {
 interface ContentData {
   id: string;
   title: string;
-  summary: string[];
+  summary?: SummarySection[];
   content?: string;
   youtube_url?: string;
   youtube_id?: string;
@@ -40,6 +55,67 @@ export default function ContentPage({ id }: ContentPageProps) {
   const [flashcardsLoading, setFlashcardsLoading] = useState<boolean>(false);
   const [audioLoading, setAudioLoading] = useState<boolean>(false);
   const [transcriptLoading, setTranscriptLoading] = useState<boolean>(false);
+  const [summaryLoading, setSummaryLoading] = useState<boolean>(false);
+
+  // Add function to fetch summary
+  const fetchSummary = async (contentId: string, forceRegenerate: boolean = false) => {
+    if (!contentId || !user?.token) return;
+    
+    try {
+      setSummaryLoading(true);
+      const response = await axios.get<SummaryResponse>(
+        `/api/spaces/generate/summary?content_id=${contentId}${forceRegenerate ? '&force=true' : ''}`,
+        {
+          headers: { Authorization: `Bearer ${user.token}` }
+        }
+      );
+      
+      if (response.data?.data) {
+        // Parse the summary data
+        let summaryData: SummarySection[] = [];
+        
+        try {
+          // Handle string response (JSON string)
+          if (typeof response.data.data === 'string') {
+            const { parseAiResponse } = await import('@/lib/ai-utils');
+            const parsed = parseAiResponse<SummaryData>(response.data.data);
+            summaryData = parsed.sections || [];
+          }
+          // Handle object response (already parsed JSON)
+          else if (typeof response.data.data === 'object') {
+            if (Array.isArray(response.data.data)) {
+              // Legacy string array format
+              summaryData = response.data.data.map((item: string) => ({ type: 'paragraph' as const, content: item }));
+            } else {
+              // New format
+              const data = response.data.data as SummaryData;
+              summaryData = data.sections || [];
+            }
+          }
+          
+          setContent(prev => prev ? {
+            ...prev,
+            summary: summaryData
+          } : null);
+        } catch (parseError) {
+          console.error('Error parsing summary JSON:', parseError);
+          // Fallback to treating it as a string array if parsing fails
+          const stringArray = Array.isArray(response.data.data) 
+            ? response.data.data 
+            : [String(response.data.data)];
+          
+          setContent(prev => prev ? {
+            ...prev,
+            summary: stringArray.map((item: string) => ({ type: 'paragraph' as const, content: item }))
+          } : null);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching summary:', error);
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
 
   // Fetch content when component mounts
   useEffect(() => {
@@ -53,21 +129,56 @@ export default function ContentPage({ id }: ContentPageProps) {
     try {
       setLoading(true);
       const res = await fetch(`/api/contents?id=${id}`, {
-        headers: {
-          Authorization: `Bearer ${user?.token}`,
-        },
+        headers: { Authorization: `Bearer ${user?.token}` },
       });
       
-      if (!res.ok) {
-        throw new Error('Failed to load content');
-      }
+      if (!res.ok) throw new Error('Failed to load content');
       
       const data = await res.json();
-      // Ensure summary is an array
-      if (data.summary && !Array.isArray(data.summary)) {
-        data.summary = [data.summary];
+      
+      // Update content first
+      // Check if data.summary is in the new format or needs conversion
+      let processedSummary = [];
+      
+      if (data.summary) {
+        if (Array.isArray(data.summary)) {
+          // Check if each item has a type property (new format)
+          if (data.summary.length > 0 && typeof data.summary[0] === 'object' && data.summary[0] !== null && 'type' in data.summary[0]) {
+            processedSummary = data.summary;
+          } else {
+            // Convert string array to structured format
+            processedSummary = data.summary.map((item: string) => ({ 
+              type: 'paragraph' as const, 
+              content: item 
+            }));
+          }
+        } else if (typeof data.summary === 'string') {
+          // Try to parse if it's a JSON string
+          try {
+            const parsed = JSON.parse(data.summary);
+            if (parsed.sections) {
+              processedSummary = parsed.sections;
+            } else {
+              processedSummary = [{ type: 'paragraph', content: data.summary }];
+            }
+          } catch {
+            processedSummary = [{ type: 'paragraph', content: data.summary }];
+          }
+        } else if (typeof data.summary === 'object') {
+          // It might already be in the correct format
+          processedSummary = data.summary.sections || [];
+        }
       }
-      setContent(data);
+      
+      setContent({
+        ...data,
+        summary: processedSummary
+      });
+      
+      // Always try to fetch/refresh the summary in the background
+      if (data.id) {
+        fetchSummary(data.id, true); // Force regenerate summary to get the new JSON structure
+      }
       
       // Once we have content data, fetch specific content types
       if (data.id) {
@@ -234,26 +345,20 @@ export default function ContentPage({ id }: ContentPageProps) {
 
   return (
     <div className="flex min-h-screen w-full overflow-x-hidden">
-      {/* Main Content */}
-      <div className="flex-1">
-        <main className="py-5 px-6 md:px-8 max-w-7xl pr-0">
-          {content && (
-            <>
-              <LeftPanel 
-                id={content.id}
-                title={content.title}
-                summary={content.summary || []}
-              />
-            </>
-          )}
-        </main>
+      {/* Left Panel with Summary */}
+      <div className="flex-1 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
+        <LeftPanel 
+          id={content.id}
+          title={content.title}
+          summary={content.summary || []}
+        />
       </div>
       
-      {/* Right Sidebar with props */}
-      <div className="hidden lg:block">
+      {/* Right Sidebar */}
+      <div className="border-l border-gray-200 dark:border-gray-700 h-full">
         <RightSidebar 
-          contentId={content?.id}
-          youtubeId={content?.youtube_id}
+          contentId={content.id}
+          youtubeId={content.youtube_id}
           mindmapData={mindmapData}
           mindmapLoading={mindmapLoading}
           quizData={quizData}
