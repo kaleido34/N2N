@@ -1,16 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-interface TranscriptsDialogProps {
-  transcriptData: any;
-  transcriptLoading: boolean;
-  contentId?: string;
-  youtubeId?: string;
-}
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 interface Transcript {
   id: string;
@@ -19,61 +10,108 @@ interface Transcript {
   content: string;
 }
 
+interface TranscriptSegment {
+  text: string;
+  startTime?: number;
+  endTime?: number;
+}
+
+interface TranscriptData {
+  transcript: TranscriptSegment[] | string;
+  source_type?: 'youtube' | 'document' | 'audio' | 'image';
+  youtube_id?: string;
+}
+
+interface TranscriptsDialogProps {
+  transcriptData: TranscriptData | any;
+  transcriptLoading: boolean;
+  contentId?: string;
+  youtubeId?: string;
+}
+
 export function TranscriptsDialog({ transcriptData, transcriptLoading, contentId, youtubeId }: TranscriptsDialogProps) {
   const [open, setOpen] = useState(false);
+  
+  // Debug what format we're receiving
+  console.log("Transcript data format received:", transcriptData);
 
   // Sample transcript data - use as fallback if real data isn't available
-  const sampleTranscripts: Transcript[] = [
-    {
-      id: "transcript-1",
-      title: "Microsoft's Open Source Moves",
-      date: "October 15, 2023",
-      content: `
-In today's lecture, we'll be discussing Microsoft's recent moves in the open source community, particularly focusing on GitHub Copilot.
+  const sampleTranscript = {
+    content: `Sample transcript content...`
+  };
 
-Microsoft has announced plans to open source GitHub Copilot, which is a significant shift in their AI strategy. This decision follows their previous moves to open source Windows Subsystem for Linux and other developer tools.
-
-The open sourcing of GitHub Copilot will allow developers to:
-- Access and modify the underlying code
-- Create custom versions tailored to specific needs
-- Contribute improvements back to the community
-- Better understand how AI code suggestions work
-
-This move represents a continuation of Microsoft's transformation under Satya Nadella's leadership, embracing open source as a core part of their business strategy rather than viewing it as competition.
-
-The implications for developers are substantial, as this could lead to more transparent and customizable AI coding assistants, potentially addressing some of the concerns around training data and licensing that have surrounded Copilot since its launch.
-      `
-    },
-    {
-      id: "transcript-2",
-      title: "Impact of Open Source AI Tools",
-      date: "October 17, 2023",
-      content: `
-Today we're examining the broader impact of open source AI tools on the developer ecosystem.
-
-When AI tools like GitHub Copilot become open source, several important shifts occur in the development landscape:
-
-1. Democratization of AI capabilities:
-   - Smaller companies can leverage and customize these tools
-   - Educational institutions can better teach AI concepts using real-world tools
-   - Individual developers gain access to enterprise-grade AI assistance
-
-2. Transparency and trust:
-   - Open source allows for code audits and security reviews
-   - Developers can understand how their data is being used
-   - Ethical concerns can be addressed through community oversight
-
-3. Innovation acceleration:
-   - Community contributions often lead to unexpected use cases
-   - Specialized versions can emerge for different programming languages or domains
-   - Integration with other tools becomes easier and more robust
-
-The open sourcing of AI coding tools represents a significant step toward making artificial intelligence a standard part of the development workflow, rather than a premium feature only available to those who can afford it.
-
-This shift aligns with the broader history of development tools, where open source has consistently driven innovation and adoption.
-      `
+  // Normalize transcript data to a standard format
+  const normalizeTranscript = (): TranscriptSegment[] => {
+    if (!transcriptData) return [{ text: sampleTranscript.content }];
+    
+    // If data has transcript property and it's an array, use that
+    if (transcriptData.transcript && Array.isArray(transcriptData.transcript)) {
+      return transcriptData.transcript.map((segment: any) => ({
+        text: segment.text || '',
+        startTime: segment.startTime !== undefined ? segment.startTime : undefined,
+        endTime: segment.endTime !== undefined ? segment.endTime : undefined
+      }));
     }
-  ];
+    
+    // If data.transcript is a string
+    if (transcriptData.transcript && typeof transcriptData.transcript === 'string') {
+      return [{ text: transcriptData.transcript }];
+    }
+    
+    // If data itself is an array (direct transcript segments)
+    if (Array.isArray(transcriptData)) {
+      return transcriptData.map((segment: any) => ({
+        text: segment.text || '',
+        startTime: segment.startTime !== undefined ? segment.startTime : undefined,
+        endTime: segment.endTime !== undefined ? segment.endTime : undefined
+      }));
+    }
+    
+    // If data.data exists (API response wrapper)
+    if (transcriptData.data) {
+      if (transcriptData.data.transcript) {
+        return normalizeTranscript.call({ transcriptData: transcriptData.data });
+      }
+    }
+    
+    // Handle string content directly
+    if (typeof transcriptData === 'string') {
+      return [{ text: transcriptData }];
+    }
+    
+    // Handle legacy format with content property
+    if (transcriptData.content) {
+      return [{ text: transcriptData.content }];
+    }
+    
+    // Last resort
+    return [{ text: "No transcript content available" }];
+  };
+  
+  // Get normalized transcript segments
+  const transcriptSegments = normalizeTranscript();
+  
+  // Check if we have timestamps to display
+  const hasTimestamps = transcriptSegments.some(segment => 
+    segment.startTime !== undefined || segment.endTime !== undefined
+  );
+  
+  // Get source type for context-specific UI
+  const sourceType = transcriptData?.source_type || 
+    (transcriptData?.data?.source_type || 'unknown');
+  
+  // Format timestamp (if available)
+  const formatTime = (seconds: number) => {
+    if (!seconds && seconds !== 0) return '';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+  
+  // Extract plain text for copy functionality
+  const getPlainText = () => {
+    return transcriptSegments.map(segment => segment.text).join('\n');
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -89,52 +127,61 @@ This shift aligns with the broader history of development tools, where open sour
           Transcripts
         </button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[750px] p-0 overflow-hidden bg-[#FAF7F8] dark:bg-gray-900">
+      <DialogContent className="sm:max-w-[850px] w-[90vw] max-h-[80vh] p-0 overflow-hidden bg-[#FAF7F8] dark:bg-gray-900">
         {transcriptLoading ? (
           <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#5B4B8A]"></div>
           </div>
         ) : (
-
-        <div className="flex flex-col">
-          <div className="flex items-center gap-3 p-3 border-b">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-white">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                <line x1="9" y1="10" x2="15" y2="10"></line>
-                <line x1="9" y1="14" x2="15" y2="14"></line>
-              </svg>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-3 p-3 border-b">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-white">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                  <line x1="9" y1="10" x2="15" y2="10"></line>
+                  <line x1="9" y1="14" x2="15" y2="14"></line>
+                </svg>
+              </div>
+              <DialogTitle className="text-lg font-semibold text-[#5B4B8A]">Transcript</DialogTitle>
             </div>
-            <DialogTitle className="text-lg font-semibold text-[#5B4B8A]">Lecture Transcripts</DialogTitle>
-          </div>
-          
-          <div className="p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm">
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="text-lg font-medium text-[#5B4B8A] dark:text-white">
-                  {transcriptData ? "Lecture Transcript" : sampleTranscripts[0].title}
-                </h3>
-                <span className="text-sm text-gray-500 dark:text-gray-400">
-                  {transcriptData?.timestamp || (new Date()).toLocaleDateString()}
-                </span>
+            
+            <div className="prose dark:prose-invert max-w-none">
+              <div className="flex justify-between items-center p-2 border-b">
+                <div className="text-sm text-gray-500">
+                  {sourceType !== 'unknown' && (
+                    <span className="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded-md capitalize">
+                      {sourceType} source
+                    </span>
+                  )}
+                </div>
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText(getPlainText());
+                  }}
+                  className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                >
+                  Copy text
+                </button>
               </div>
               
-              <div className="prose dark:prose-invert max-w-none">
-                <pre className="whitespace-pre-wrap text-sm font-normal text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 p-4 rounded-md overflow-auto max-h-[400px]">
-                  {transcriptData ? (
-                    Array.isArray(transcriptData) ? 
-                      transcriptData.map((item: any, index: number) => (
-                        <div key={index} className="mb-2">
-                          <span className="text-xs text-gray-500">[{item.startTime || ''}]</span> {item.text}
-                        </div>
-                      ))
-                    : transcriptData.text || "No transcript content available."
-                  ) : sampleTranscripts[0].content}
-                </pre>
-              </div>
+              <pre className="whitespace-pre-wrap text-sm font-normal text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 p-4 rounded-md overflow-auto max-h-[500px]">
+                {hasTimestamps ? (
+                  transcriptSegments.map((segment, index) => (
+                    <div key={index} className="mb-2">
+                      {segment.startTime !== undefined && (
+                        <span className="text-xs text-gray-500 mr-2 inline-block w-16">
+                          [{formatTime(segment.startTime)}]
+                        </span>
+                      )}
+                      <span>{segment.text}</span>
+                    </div>
+                  ))
+                ) : (
+                  getPlainText()
+                )}
+              </pre>
             </div>
           </div>
-        </div>
         )}
       </DialogContent>
     </Dialog>

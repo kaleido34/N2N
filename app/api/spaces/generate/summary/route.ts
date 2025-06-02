@@ -42,15 +42,29 @@ export async function GET(req: NextRequest) {
             }, { status: 200 });
         }
 
-        // If no metadata exists or no summary in metadata, create it
-        if (!existingMetadata) {
-            await prisma.metadata.create({
-                data: {
-                    content_id: content_id,
-                    created_at: new Date(),
-                    updated_at: new Date()
+        // Check if metadata exists, create it if needed
+        let metadataRecord = existingMetadata;
+        if (!metadataRecord) {
+            try {
+                metadataRecord = await prisma.metadata.create({
+                    data: {
+                        content_id: content_id,
+                        created_at: new Date(),
+                        updated_at: new Date()
+                    }
+                });
+            } catch (createError) {
+                // If there's a unique constraint error, the metadata was created by another concurrent request
+                // Fetch it instead
+                metadataRecord = await prisma.metadata.findUnique({
+                    where: { content_id: content_id }
+                });
+                
+                // If still not found, something else went wrong
+                if (!metadataRecord) {
+                    throw createError;
                 }
-            });
+            }
         }
 
         // Get content type and retrieve transcript based on content type
@@ -114,44 +128,173 @@ export async function GET(req: NextRequest) {
         }
 
         // Generate summary
-        const summaryText = await summarizeChunks(transcriptText);
-        if (!summaryText) {
-            return NextResponse.json({ message: "Could not generate summary" }, { status: 500 });
+        let summaryText;
+        try {
+            summaryText = await summarizeChunks(transcriptText);
+            if (!summaryText) {
+                throw new Error('Empty summary text received');
+            }
+        } catch (error) {
+            console.error('Error generating summary:', error);
+            // Create a basic fallback without trying to parse anything
+            return NextResponse.json({ 
+                message: 'Using fallback summary due to generation error',
+                data: JSON.stringify({
+                    sections: [
+                        {
+                            type: 'heading',
+                            level: 2,
+                            content: 'Summary Temporarily Unavailable'
+                        },
+                        {
+                            type: 'paragraph',
+                            content: 'We could not generate a summary for this content at this time.'
+                        },
+                        {
+                            type: 'paragraph',
+                            content: 'Please try again later when the AI service is less busy.'
+                        }
+                    ]
+                })
+            });
         }
         
         // Parse the JSON summary
         let parsedSummary;
         try {
-            // Import the parseAiResponse helper dynamically
-            const parseAiResponse = await import('@/lib/ai-utils').then(module => module.parseAiResponse);
+            // First try direct JSON parsing since our fallback is already JSON
+            try {
+                parsedSummary = JSON.parse(summaryText);
+            } catch (jsonError) {
+                // If direct parsing fails, try with the AI response parser
+                const parseAiResponse = await import('@/lib/ai-utils').then(module => module.parseAiResponse);
+                parsedSummary = parseAiResponse(summaryText);
+            }
             
-            // Parse the summary text to get the structured data
-            parsedSummary = parseAiResponse(summaryText);
+            // Validate the structure
+            if (!parsedSummary || typeof parsedSummary !== 'object') {
+                throw new Error('Invalid summary structure: not an object');
+            }
             
-            // Save the original JSON string in metadata (for backward compatibility)
-            await prisma.metadata.update({
-                where: { content_id: content_id },
-                data: { summary: summaryText }
-            });
+            // Ensure sections exist and are properly structured
+            if (!parsedSummary.sections) {
+                // If it's an array, treat it as sections
+                if (Array.isArray(parsedSummary)) {
+                    parsedSummary = { 
+                        sections: parsedSummary.map(item => {
+                            if (typeof item === 'string') {
+                                return { type: 'paragraph', content: item };
+                            }
+                            return item;
+                        })
+                    };
+                } else {
+                    // Create default sections if missing
+                    parsedSummary = {
+                        sections: [
+                            {
+                                type: 'paragraph',
+                                content: 'Summary data could not be properly structured.'
+                            }
+                        ]
+                    };
+                }
+            }
             
-            return NextResponse.json({
-                message: `Successfully created summary for content_id: ${content_id}`,
-                data: parsedSummary
+            // Validate each section has at least type and content
+            parsedSummary.sections = parsedSummary.sections.map((section: any) => {
+                if (!section.type) {
+                    section.type = 'paragraph';
+                }
+                if (!section.content) {
+                    section.content = 'Content unavailable';
+                }
+                return section;
             });
         } catch (parseError) {
-            console.error("Error parsing summary JSON:", parseError);
-            
-            // If JSON parsing fails, save and return as-is (fallback to the old behavior)
-            await prisma.metadata.update({
-                where: { content_id: content_id },
-                data: { summary: summaryText }
-            });
-            
-            return NextResponse.json({
-                message: `Successfully created summary for content_id: ${content_id}`,
-                data: summaryText
-            });
+            console.error('Error parsing summary:', parseError);
+            // Create a simple fallback
+            parsedSummary = {
+                sections: [
+                    {
+                        type: 'paragraph',
+                        content: 'There was an error processing the summary. Please try again later.'
+                    }
+                ]
+            };
         }
+        
+        // Ensure sections are in the expected format before saving
+        if (!parsedSummary || !parsedSummary.sections || !Array.isArray(parsedSummary.sections)) {
+            console.error('Invalid summary data structure before saving:', parsedSummary);
+            parsedSummary = {
+                sections: [
+                    {
+                        type: 'paragraph' as const,
+                        content: 'The summary data structure was invalid. Please try regenerating the summary.'
+                    }
+                ]
+            };
+        }
+
+        // Validate each section to ensure it has the correct structure
+        const validatedSections = parsedSummary.sections.map((section: any) => {
+            // Ensure type is one of the allowed values
+            const validTypes = ['heading', 'paragraph', 'list_item'];
+            const type = validTypes.includes(section.type) ? section.type : 'paragraph';
+            
+            // Ensure content is a string
+            const content = typeof section.content === 'string' 
+                ? section.content 
+                : JSON.stringify(section.content);
+                
+            // Create a valid section object
+            return {
+                type,
+                level: section.level || undefined,
+                content
+            };
+        });
+        
+        // Create the final validated summary data
+        const validatedSummary = {
+            sections: validatedSections
+        };
+        
+        // Save the properly structured JSON in metadata
+        await prisma.metadata.update({
+            where: { content_id: content_id },
+            data: { summary: JSON.stringify(validatedSummary) }
+        });
+        
+        // IMPORTANT: We always want to return the array of sections directly
+        // not nested in a 'sections' property
+        const sectionsArray = validatedSummary.sections;
+        
+        // Log what we're returning to help with debugging
+        console.log('Returning summary API response with sections:', {
+            count: sectionsArray.length,
+            firstSection: sectionsArray[0],
+            isArray: Array.isArray(sectionsArray)
+        });
+        
+        // Debug log - full sections content for troubleshooting
+        console.log('FULL SECTIONS CONTENT:', JSON.stringify(sectionsArray, null, 2));
+        
+        // Check if there are any complex objects that might not stringify well
+        sectionsArray.forEach((section: any, i: number) => {
+            console.log(`Section ${i} type:`, typeof section.content);
+            if (typeof section.content !== 'string') {
+                console.log(`Section ${i} has non-string content:`, section.content);
+                // Force it to be a string
+                section.content = String(section.content);
+            }
+        });
+        
+        return NextResponse.json({
+            message: `Successfully created summary for content_id: ${content_id}`,
+            data: sectionsArray
+        });
         
 
     } catch (error) {

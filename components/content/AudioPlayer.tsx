@@ -3,12 +3,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, X } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, X, Headphones } from "lucide-react";
 
 interface AudioPlayerProps {
   isVisible: boolean;
   onClose: () => void;
-  title?: string;
+  contentTitle?: string; // NEW: dynamic content title
   audioData?: {
     audioUrl: string;
   };
@@ -17,18 +17,51 @@ interface AudioPlayerProps {
   youtubeId?: string;
 }
 
-export function AudioPlayer({ isVisible, onClose, title = "Lecture Audio", audioData, audioLoading, contentId, youtubeId }: AudioPlayerProps) {
+export function AudioPlayer({ isVisible, onClose, contentTitle, audioData, audioLoading, contentId, youtubeId }: AudioPlayerProps) {
+  // Use contentTitle if provided, otherwise fallback
+  const title = contentTitle || "Lecture Audio";
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.7);
   const [isMuted, setIsMuted] = useState(false);
+  const [audioError, setAudioError] = useState<string | null>(null);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationRef = useRef<number | undefined>(undefined);
 
-  // Use real audio URL if available, otherwise fallback to sample
-  const audioUrl = audioData?.audioUrl || "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3";
+  // Debug the audio data
+  useEffect(() => {
+    console.log('AudioPlayer received audioData:', audioData);
+  }, [audioData]);
+
+  // Use real audio URL if available, otherwise set to empty string
+  // The URL should already be proxied from the backend
+  const audioUrl = audioData?.audioUrl || "";
+  
+  // Log the audio URL for debugging
+  useEffect(() => {
+    if (audioUrl) {
+      console.log('Using audio URL:', audioUrl);
+    } else {
+      console.log('No audio URL available yet, waiting for data');
+    }
+  }, [audioUrl]);
+  
+  // For debugging - attempt to fetch the URL directly to verify it works
+  useEffect(() => {
+    if (audioUrl && audioUrl.startsWith('/api/proxy/audio')) {
+      console.log('Testing proxy URL:', audioUrl);
+      fetch(audioUrl)
+        .then(response => {
+          console.log('Proxy URL test response:', response.status, response.statusText);
+          console.log('Content-Type:', response.headers.get('Content-Type'));
+        })
+        .catch(error => {
+          console.error('Error testing proxy URL:', error);
+        });
+    }
+  }, [audioUrl]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -43,28 +76,198 @@ export function AudioPlayer({ isVisible, onClose, title = "Lecture Audio", audio
   }, [isMuted]);
 
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    const handleTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
-    };
-
-    const handleLoadedMetadata = () => {
-      setDuration(audio.duration);
-      setCurrentTime(audio.currentTime);
-    };
-
-    // Events
-    audio.addEventListener('loadeddata', handleLoadedMetadata);
-    audio.addEventListener('timeupdate', handleTimeUpdate);
-
-    // Cleanup
-    return () => {
-      audio.removeEventListener('loadeddata', handleLoadedMetadata);
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-    };
-  }, []);
+    // Clean up previous audio instance
+    if (audioRef.current) {
+      // Stop playback and remove event listeners before creating a new instance
+      audioRef.current.pause();
+      audioRef.current.src = '';
+      
+      // Cancel any pending animation frames
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = undefined;
+      }
+      
+      // Reset state
+      setIsPlaying(false);
+      setCurrentTime(0);
+      setDuration(0);
+      
+      // Clear the reference
+      audioRef.current = null;
+    }
+    
+    if (!audioUrl) {
+      setAudioError('Audio will be available when content is ready...');
+      return;
+    }
+    
+    // Validate URL to catch [object Object] issues early
+    if (typeof audioUrl !== 'string') {
+      setAudioError('Invalid audio URL format. Please try again.');
+      return;
+    }
+    
+    if (audioUrl.includes('[object Object]') || audioUrl.includes('%5Bobject%20Object%5D')) {
+      setAudioError('Invalid audio URL format. Please try again.');
+      return;
+    }
+    
+    // Set up audio with URL
+    setAudioError(null); // Clear any previous errors when trying a new URL
+    
+    try {
+      // Create new audio element with better error handling
+      const audio = new Audio();
+      
+      // Configure audio element for optimal performance
+      audio.preload = 'metadata';
+      audio.crossOrigin = 'anonymous'; // Handle CORS issues
+      audio.volume = volume;
+      audio.muted = isMuted;
+      
+      // Set the source AFTER adding event listeners to catch all events properly
+      // This is important because some browsers trigger events immediately when src is set
+      
+      // Named event listener functions for proper cleanup
+      const onMetadataLoaded = () => {
+        console.log('Audio metadata loaded successfully, duration:', audio.duration);
+        setDuration(audio.duration);
+      };
+      
+      const onTimeUpdate = () => {
+        setCurrentTime(audio.currentTime);
+      };
+      
+      const onEnded = () => {
+        console.log('Audio playback ended');
+        setIsPlaying(false);
+        if (animationRef.current) {
+          cancelAnimationFrame(animationRef.current);
+        }
+      };
+      
+      const onCanPlay = () => {
+        console.log('Audio can now be played');
+      };
+      
+      const onPlaying = () => {
+        console.log('Audio is now playing');
+        setAudioError(null); // Clear error if playback starts successfully
+      };
+      
+      // Improved error handling with specific error code detection and fallback options
+      const onError = (e: Event) => {
+        console.error('Audio element error event:', e);
+        
+        // Check if we should try a different format or approach
+        const tryAlternativeSource = () => {
+          // For format errors, try appending a format parameter to force MP3
+          if (audioUrl && !audioUrl.includes('&format=mp3')) {
+            const newUrl = `${audioUrl}${audioUrl.includes('?') ? '&' : '?'}format=mp3&_t=${Date.now()}`;
+            console.log('Trying alternative audio format with URL:', newUrl);
+            audio.src = newUrl;
+            audio.load();
+            return true;
+          }
+          return false;
+        };
+        
+        let errorMessage = 'Failed to play audio. Please try again.';
+        
+        if (audio.error) {
+          // Log detailed error information
+          console.error('Audio error code:', audio.error.code);
+          console.error('Audio error message:', audio.error.message);
+          
+          // Provide specific error messages based on error codes
+          switch (audio.error.code) {
+            case MediaError.MEDIA_ERR_ABORTED:
+              errorMessage = 'Playback aborted by the user';
+              break;
+            case MediaError.MEDIA_ERR_NETWORK:
+              errorMessage = 'Network error while loading audio. Please try again.';
+              break;
+            case MediaError.MEDIA_ERR_DECODE:
+              errorMessage = 'Audio decoding error. Please try again.';
+              // Try alternative format for decode errors
+              if (tryAlternativeSource()) {
+                return; // Don't set error message if we're trying a fallback
+              }
+              break;
+            case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+              errorMessage = 'Audio format not supported.';
+              // Try alternative format for format errors
+              if (tryAlternativeSource()) {
+                return; // Don't set error message if we're trying a fallback
+              }
+              break;
+            default:
+              errorMessage = `Audio error: ${audio.error.message || 'Unknown error'}`;
+              // Try alternative as a last resort
+              if (tryAlternativeSource()) {
+                return;
+              }
+          }
+        }
+        
+        // Set the error message for display
+        setAudioError(errorMessage);
+        
+        // Stop playback on error
+        audio.pause();
+        setIsPlaying(false);
+        
+        // Cancel any animation frame to stop seeking updates
+        if (animationRef.current) {
+          cancelAnimationFrame(animationRef.current);
+        }
+      };
+      
+      // Set up all event listeners
+      audio.addEventListener('loadedmetadata', onMetadataLoaded);
+      audio.addEventListener('timeupdate', onTimeUpdate);
+      audio.addEventListener('ended', onEnded);
+      audio.addEventListener('canplay', onCanPlay);
+      audio.addEventListener('playing', onPlaying);
+      audio.addEventListener('error', onError);
+      
+      // Set audio reference first so error handlers can access it
+      audioRef.current = audio;
+      
+      // Set the source LAST - this can trigger immediate events in some browsers
+      console.log('Setting audio source to:', audioUrl);
+      audio.src = audioUrl;
+      
+      // Start loading the audio
+      audio.load();
+      
+      // Clean up function to remove event listeners
+      return () => {
+        console.log('Cleaning up audio element');
+        // Remove all event listeners with named functions
+        audio.removeEventListener('loadedmetadata', onMetadataLoaded);
+        audio.removeEventListener('timeupdate', onTimeUpdate);
+        audio.removeEventListener('ended', onEnded);
+        audio.removeEventListener('canplay', onCanPlay);
+        audio.removeEventListener('playing', onPlaying);
+        audio.removeEventListener('error', onError);
+        
+        // Stop and clear audio
+        audio.pause();
+        audio.src = '';
+        
+        audioRef.current = null;
+        
+        if (animationRef.current) {
+          cancelAnimationFrame(animationRef.current);
+        }
+      };
+    } catch (err) {
+      console.error('Error creating audio element:', err);
+      setAudioError('Failed to initialize audio player. Please try again.');
+    }
+  }, [audioUrl, volume, isMuted]);
 
   const togglePlayPause = () => {
     const audio = audioRef.current;
@@ -76,7 +279,19 @@ export function AudioPlayer({ isVisible, onClose, title = "Lecture Audio", audio
         cancelAnimationFrame(animationRef.current);
       }
     } else {
-      audio.play();
+      // Log the current audio source before playing
+      console.log('Playing audio from URL:', audio.src);
+      
+      // Clear any previous errors
+      setAudioError(null);
+      
+      // Try to play and catch any errors
+      audio.play().catch(error => {
+        console.error('Error playing audio:', error);
+        setAudioError('Failed to play audio. Please try again.');
+        setIsPlaying(false);
+      });
+      
       animationRef.current = requestAnimationFrame(whilePlaying);
     }
     setIsPlaying(!isPlaying);
@@ -144,17 +359,25 @@ export function AudioPlayer({ isVisible, onClose, title = "Lecture Audio", audio
   }
 
   return (
-    <div className="fixed bottom-4 left-20 w-[calc(100vw-450px)] bg-[#FAF7F8] dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-3 shadow-lg z-50 rounded-lg">
-      <audio ref={audioRef} src={audioUrl} preload="metadata" />
+    <div className={`fixed bottom-4 left-20 w-[calc(100vw-450px)] bg-[#FAF7F8] dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-3 shadow-lg z-50 rounded-lg transform transition-transform duration-300 ease-in-out ${isVisible ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none'}`}>
+      {/* We use the Audio API directly instead of an audio element in the DOM */}
+      
+      {/* Display any audio errors */}
+      {audioError && (
+        <div className="text-red-500 text-sm mb-2">{audioError}</div>
+      )}
+      
+      {/* Debug info - remove in production */}
+      <div className="text-xs text-gray-400 mb-1 max-w-full overflow-hidden text-ellipsis">
+
+      </div>
       
       <div className="w-full mx-auto flex flex-col space-y-1">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-pink-400 to-rose-500 flex items-center justify-center">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-white">
-                <rect x="2" y="7" width="20" height="10" rx="2" ry="2"></rect>
-                <circle cx="12" cy="12" r="3"></circle>
-              </svg>
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center">
+              {/* Headphones icon from lucide-react */}
+              <Headphones className="h-5 w-5 text-white" />
             </div>
             <h3 className="font-medium text-sm text-gray-900 dark:text-white">{title}</h3>
           </div>

@@ -21,6 +21,12 @@ export default function LeftPanel({
   title 
 }: LeftPanelProps) {
   const router = useRouter();
+  
+  // Debug: Log summary data to see its structure
+  React.useEffect(() => {
+    console.log('LeftPanel summary type:', typeof summary, Array.isArray(summary));
+    console.log('LeftPanel summary value:', summary);
+  }, [summary]);
 
   const handleBack = () => {
     router.back();
@@ -32,51 +38,67 @@ export default function LeftPanel({
     level?: number;
     content: string;
   }) => {
-    const { type, level, content } = section;
+    console.log('Rendering section:', typeof section, section);
+    
+    // Safety check for section structure
+    if (!section || typeof section !== 'object') {
+      return <p className="text-red-500">Invalid section format</p>;
+    }
+    
+    const { type, content, level } = section;
+    
+    // Ensure content is a string to avoid [object Object] display
+    const contentStr = typeof content === 'string' ? content : String(content || '');
+    
+    // Debug output to help diagnose the issue
+    console.log(`Section type: ${type}, content type: ${typeof content}, stringified: ${contentStr}`);
     
     switch (type) {
-      case 'heading':
-        // Handle headings based on level
-        if (level === 1) {
+      case 'heading': {
+        // Use dynamic heading tag based on level with proper typing
+        const headingLevel = level && level <= 6 ? level : 3;
+        
+        if (headingLevel === 1) {
           return (
             <h1 className="text-xl font-bold text-[#5B4B8A] dark:text-white mt-4 mb-2">
-              {content}
+              {contentStr}
             </h1>
           );
-        } else if (level === 2) {
+        } else if (headingLevel === 2) {
           return (
             <h2 className="text-lg font-bold text-[#5B4B8A] dark:text-white mt-4 mb-2">
-              {content}
+              {contentStr}
             </h2>
           );
-        } else if (level === 3) {
+        } else if (headingLevel === 3) {
           return (
             <h3 className="text-base font-semibold text-[#4A3E78] dark:text-gray-200 mt-3 mb-1">
-              {content}
+              {contentStr}
             </h3>
           );
         } else {
-          // Default heading style
           return (
             <h4 className="text-sm font-semibold text-[#4A3E78] dark:text-gray-200 mt-3 mb-1">
-              {content}
+              {contentStr}
             </h4>
           );
         }
+      }
         
       case 'list_item':
         return (
           <li className="text-gray-700 dark:text-gray-300 leading-relaxed my-1 ml-6 list-disc">
-            {content}
+            {contentStr}
           </li>
         );
         
       case 'paragraph':
       default:
         // Check if paragraph has bold content with **text** pattern
-        if (content.match(/\*\*.*?\*\*/)) {
+        // Use a safe approach to check for patterns
+        if (contentStr && contentStr.indexOf('**') !== -1) {
           // Text with bolded sections using **text**
-          const parts = content.split(/(\*\*.*?\*\*)/g);
+          const parts = contentStr.split(/(\*\*.*?\*\*)/g);
           return (
             <p className="text-gray-700 dark:text-gray-300 leading-relaxed my-1">
               {parts.map((part, i) => {
@@ -92,7 +114,7 @@ export default function LeftPanel({
           // Regular paragraph
           return (
             <p className="text-gray-700 dark:text-gray-300 leading-relaxed my-1">
-              {content}
+              {contentStr}
             </p>
           );
         }

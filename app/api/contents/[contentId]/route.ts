@@ -3,7 +3,9 @@ import prisma from "@/lib/prisma";
 import { authenticateUser, checkContentAccess } from "@/lib/auth-helpers";
 
 export async function DELETE(req: NextRequest, { params }: { params: { contentId: string } }) {
-  const { contentId } = params;
+  // Properly handle params by awaiting them for Next.js App Router
+  const contentParams = await Promise.resolve(params);
+  const contentId = contentParams.contentId;
   
   // 1. Authenticate user with centralized helper
   const { user, error } = await authenticateUser(req);

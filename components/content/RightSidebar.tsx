@@ -32,6 +32,9 @@ import { GamesDialog } from "./GamesDialog";
 import { AudioPlayer } from "./AudioPlayer";
 import { TranscriptsDialog } from "./TranscriptsDialog";
 
+// Add type for contentTitle if available
+
+
 interface RightSidebarProps {
   contentId?: string;
   youtubeId?: string;
@@ -59,8 +62,9 @@ export default function RightSidebar({
   audioData,
   audioLoading,
   transcriptData,
-  transcriptLoading
-}: RightSidebarProps) {
+  transcriptLoading,
+  contentTitle // <-- add contentTitle if available
+}: RightSidebarProps & { contentTitle?: string }) {
   const { user, logout } = useAuth();
   const router = useRouter();
   const [showAudioPlayer, setShowAudioPlayer] = useState(false);
@@ -181,13 +185,13 @@ export default function RightSidebar({
 
       {/* Audio Player */}
       <AudioPlayer 
-        isVisible={showAudioPlayer} 
-        onClose={() => setShowAudioPlayer(false)} 
-        title="Content Audio"
+        isVisible={showAudioPlayer}
+        onClose={() => setShowAudioPlayer(false)}
         audioData={audioData}
         audioLoading={audioLoading}
         contentId={contentId}
         youtubeId={youtubeId}
+        contentTitle={contentTitle}
       />
     </aside>
   );

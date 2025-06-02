@@ -42,9 +42,36 @@ export function FlashcardsDialog({ flashcardsData, flashcardsLoading, contentId,
   const [isFlipped, setIsFlipped] = useState(false);
   const [open, setOpen] = useState(false);
   
-  // Use real flashcards data if available, otherwise use sample
-  const flashcards = flashcardsData?.flashcards || sampleFlashcards;
-  const currentCard = flashcards[currentCardIndex];
+  // Debug what format we're receiving
+  console.log("Flashcards data format received:", flashcardsData);
+  
+  // Handle various possible flashcards data structures
+  let flashcards: Flashcard[] = [];
+  if (flashcardsData) {
+    if (flashcardsData.flashcards && Array.isArray(flashcardsData.flashcards)) {
+      // Standard format from our API
+      flashcards = flashcardsData.flashcards;
+    } else if (Array.isArray(flashcardsData)) {
+      // Direct array format
+      flashcards = flashcardsData;
+    } else if (typeof flashcardsData === 'object' && flashcardsData !== null) {
+      // Try to extract any array property that might contain flashcards
+      const possibleArrayProps = Object.values(flashcardsData).filter(val => Array.isArray(val));
+      if (possibleArrayProps.length > 0) {
+        flashcards = possibleArrayProps[0];
+      }
+    }
+  }
+  
+  console.log("Processed flashcards:", flashcards);
+  
+  // After all parsing attempts, if flashcards array is empty, use sample flashcards as fallback
+  if (flashcards.length === 0) {
+    console.log('No valid flashcards found, using sample data');
+    flashcards = sampleFlashcards;
+  }
+  
+  const currentCard = flashcards[currentCardIndex] || sampleFlashcards[0];
   const totalCards = flashcards.length;
 
   const handleNext = () => {

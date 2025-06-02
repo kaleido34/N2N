@@ -59,60 +59,167 @@ export default function ContentPage({ id }: ContentPageProps) {
 
   // Add function to fetch summary
   const fetchSummary = async (contentId: string, forceRegenerate: boolean = false) => {
-    if (!contentId || !user?.token) return;
+    console.log(`⭐ fetchSummary called for contentId: ${contentId}, force: ${forceRegenerate}`);
+    
+    if (!contentId) {
+      console.error('❌ Cannot fetch summary: contentId is missing');
+      return;
+    }
+    
+    if (!user?.token) {
+      console.error('❌ Cannot fetch summary: user token is missing');
+      return;
+    }
+    
+    console.log(`📋 Auth token present: ${!!user.token}`);
     
     try {
-      setSummaryLoading(true);
-      const response = await axios.get<SummaryResponse>(
-        `/api/spaces/generate/summary?content_id=${contentId}${forceRegenerate ? '&force=true' : ''}`,
-        {
-          headers: { Authorization: `Bearer ${user.token}` }
-        }
-      );
+      // Always fetch from API - skip cache for debugging
+      let shouldFetchFromApi = true;
       
-      if (response.data?.data) {
-        // Parse the summary data
-        let summaryData: SummarySection[] = [];
+      // Temporarily disable cache checking to debug the issue
+      // We'll manually clear any existing cache
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.removeItem(`n2n-content-${contentId}-summary`);
+          console.log('🧹 Cleared summary cache to force fresh API call');
+        } catch (e) {
+          console.warn('Could not clear cache:', e);
+        }
+      }
+      
+      if (shouldFetchFromApi) {
+        setSummaryLoading(true);
+        console.log('🔄 Fetching summary from API for content ID:', contentId);
+        
+        // Create full URL for logging purposes
+        const apiUrl = `/api/spaces/generate/summary?content_id=${contentId}${forceRegenerate ? '&force=true' : ''}`;
+        console.log('📡 API URL:', apiUrl);
         
         try {
-          // Handle string response (JSON string)
-          if (typeof response.data.data === 'string') {
-            const { parseAiResponse } = await import('@/lib/ai-utils');
-            const parsed = parseAiResponse<SummaryData>(response.data.data);
-            summaryData = parsed.sections || [];
-          }
-          // Handle object response (already parsed JSON)
-          else if (typeof response.data.data === 'object') {
-            if (Array.isArray(response.data.data)) {
-              // Legacy string array format
-              summaryData = response.data.data.map((item: string) => ({ type: 'paragraph' as const, content: item }));
-            } else {
-              // New format
-              const data = response.data.data as SummaryData;
-              summaryData = data.sections || [];
+          console.log('🔑 Using token:', user.token.substring(0, 10) + '...');
+          
+          const response = await axios.get<SummaryResponse>(
+            apiUrl,
+            {
+              headers: { 
+                Authorization: `Bearer ${user.token}`,
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+              }
             }
+          );
+          
+          console.log('Summary API response received:', response.data);
+          
+          if (response.data?.data) {
+            try {
+              // The API may return data in different formats, ensure it's properly parsed
+              let summaryData = response.data.data;
+              
+              // If it's a string, try to parse it as JSON
+              if (typeof summaryData === 'string') {
+                try {
+                  console.log('Summary data is a string, attempting to parse:', summaryData.substring(0, 50) + '...');
+                  summaryData = JSON.parse(summaryData);
+                } catch (parseError) {
+                  console.error('Failed to parse summary data string as JSON:', parseError);
+                  throw new Error('Invalid summary data format - failed to parse string');
+                }
+              }
+              
+              // Handle case where we might have a nested 'sections' property or direct array
+              if (summaryData && typeof summaryData === 'object' && 'sections' in summaryData && Array.isArray(summaryData.sections)) {
+                // Use the sections array from the object
+                console.log('Found sections array in summaryData object');
+                summaryData = summaryData.sections;
+              }
+              
+              // Final validation that we have an array
+              if (!Array.isArray(summaryData)) {
+                console.error('Expected array of sections but got:', typeof summaryData, summaryData);
+                throw new Error('Invalid summary data format - not an array');
+              }
+              
+              console.log('Valid summary sections array received, length:', summaryData.length);
+              
+              // Use the sections array directly - API should already validate format
+              const validSections = summaryData.map((section: any) => {
+                // Basic validation to ensure objects have required properties
+                if (!section || typeof section !== 'object') {
+                  return { type: 'paragraph' as const, content: 'Invalid section data' };
+                }
+                
+                // Ensure type is one of the allowed values
+                const validTypes = ['heading', 'paragraph', 'list_item'];
+                const type = validTypes.includes(section.type) 
+                  ? section.type as SummarySection['type']
+                  : 'paragraph' as const;
+                
+                // Ensure content is a string
+                const content = typeof section.content === 'string' 
+                  ? section.content 
+                  : String(section.content || '');
+                  
+                return {
+                  type,
+                  level: section.level,
+                  content
+                };
+              });
+              
+              console.log('Processed summary sections:', validSections.length);
+              
+              // Save to state
+              // Important: Set the validated array of sections directly to content.summary
+              setContent(prev => {
+                if (!prev) return null;
+                console.log('Setting summary in content state:', validSections);
+                return {
+                  ...prev,
+                  summary: validSections
+                };
+              });
+              
+              // Cache the successful response
+              if (typeof window !== 'undefined') {
+                localStorage.setItem(`n2n-content-${contentId}-summary`, JSON.stringify({
+                  data: validSections,  // Store the processed array directly
+                  timestamp: new Date().getTime()
+                }));
+              }
+            } catch (parseError) {
+              console.error('Error processing summary data:', parseError);
+              
+              // Create a simple fallback
+              const fallbackSummary: SummaryData = {
+                sections: [
+                  { 
+                    type: 'heading',
+                    level: 1,
+                    content: 'Summary Unavailable'
+                  },
+                  {
+                    type: 'paragraph',
+                    content: 'We were unable to generate a summary for this content. Please try again later.'
+                  }
+                ]
+              };
+              
+              // Save fallback to state
+              setContent(prev => prev ? { ...prev, summary: fallbackSummary.sections } : null);
+            }
+          } else {
+            console.error('No data in summary response');
           }
-          
-          setContent(prev => prev ? {
-            ...prev,
-            summary: summaryData
-          } : null);
-        } catch (parseError) {
-          console.error('Error parsing summary JSON:', parseError);
-          // Fallback to treating it as a string array if parsing fails
-          const stringArray = Array.isArray(response.data.data) 
-            ? response.data.data 
-            : [String(response.data.data)];
-          
-          setContent(prev => prev ? {
-            ...prev,
-            summary: stringArray.map((item: string) => ({ type: 'paragraph' as const, content: item }))
-          } : null);
+        } catch (apiError) {
+          console.error('Error making summary API request:', apiError);
+        } finally {
+          setSummaryLoading(false);
         }
       }
     } catch (error) {
       console.error('Error fetching summary:', error);
-    } finally {
       setSummaryLoading(false);
     }
   };
@@ -175,18 +282,148 @@ export default function ContentPage({ id }: ContentPageProps) {
         summary: processedSummary
       });
       
-      // Always try to fetch/refresh the summary in the background
+          // Only fetch data that's not already loaded
       if (data.id) {
-        fetchSummary(data.id, true); // Force regenerate summary to get the new JSON structure
-      }
-      
-      // Once we have content data, fetch specific content types
-      if (data.id) {
-        fetchMindmap(data.youtube_id || '', data.id);
-        fetchQuiz(data.youtube_id || '', data.id);
-        fetchFlashcards(data.youtube_id || '', data.id);
-        fetchAudio(data.youtube_id || '', data.id);
-        fetchTranscript(data.youtube_id || '', data.id);
+        // Track in-flight requests to prevent duplicates
+        const inFlightRequests = new Set<string>();
+        
+        // Add debounce to prevent rapid API calls
+        const debounce = (fn: Function, delay: number) => {
+          let timeout: NodeJS.Timeout;
+          return (...args: any[]) => {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => fn(...args), delay);
+          };
+        };
+        
+        // Consolidate and prioritize API calls with caching
+        const fetchDataSequentially = async () => {
+          try {
+            // Create a cache key based on content ID
+            const cachePrefix = `n2n-content-${data.id}`;
+            
+            // Helper to check if data exists in cache
+            const checkCache = (key: string) => {
+              // Skip localStorage in SSR context
+              if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+                return null;
+              }
+              
+              try {
+                const cached = localStorage.getItem(`${cachePrefix}-${key}`);
+                if (cached) {
+                  const parsed = JSON.parse(cached);
+                  if (parsed && typeof parsed === 'object' && 'data' in parsed && 'timestamp' in parsed) {
+                    const { data: cachedData, timestamp } = parsed;
+                    const now = new Date().getTime();
+                    // Cache valid for 30 minutes
+                    if (now - timestamp < 30 * 60 * 1000) {
+                      return cachedData;
+                    }
+                  }
+                }
+              } catch (e) {
+                console.warn('Cache read error:', e);
+                // Silent fail, just continue with API fetch
+              }
+              return null;
+            };
+            
+            // Helper to save data to cache
+            const saveToCache = (key: string, data: any) => {
+              // Skip localStorage in SSR context
+              if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+                return;
+              }
+              
+              try {
+                // Only cache if data is valid
+                if (data !== undefined && data !== null) {
+                  localStorage.setItem(`${cachePrefix}-${key}`, JSON.stringify({
+                    data,
+                    timestamp: new Date().getTime()
+                  }));
+                }
+              } catch (e) {
+                console.warn('Cache write error:', e);
+                // Silent fail on storage errors
+              }
+            };
+            
+            // Generic helper for fetching with cache
+            const fetchWithCache = async (key: string, fetchFn: Function, ...args: any[]) => {
+              // Extract forceRefresh from args if it exists (last parameter)
+              const forceRefresh = typeof args[args.length - 1] === 'boolean' ? args.pop() : false;
+              
+              // Check if we're already fetching this data
+              if (inFlightRequests.has(key)) {
+                console.log(`Skipping duplicate request for ${key}`);
+                return null;
+              }
+              
+              inFlightRequests.add(key);
+              console.log(`Fetching ${key} data... ${forceRefresh ? '(forced refresh)' : ''}`);
+              
+              try {
+                // For summary or when forceRefresh is true, skip cache and fetch fresh data
+                if (key === 'summary' || forceRefresh) {
+                  console.log(`Forcing fresh ${key} fetch`);
+                  const result = await fetchFn(...args);
+                  return result;
+                }
+                
+                // For other data types, try cache first
+                const cachedData = checkCache(key);
+                if (cachedData) {
+                  console.log(`Using cached ${key} data`);
+                  return cachedData;
+                }
+                
+                // Fetch fresh data if not in cache
+                const result = await fetchFn(...args);
+                return result;
+              } finally {
+                inFlightRequests.delete(key);
+              }
+              return null;
+            };
+            
+            // First priority: Fetch summary and transcript - crucial for reading
+            // Always fetch the summary - removing the conditional check that was preventing it
+            console.log('Fetching summary regardless of existing data');
+            await fetchWithCache('summary', fetchSummary, data.id, false);
+            
+            // Debug what summary data looks like after fetch
+            console.log('After fetch summary check:', {
+              hasSummary: !!data.summary,
+              summaryType: typeof data.summary,
+              isArray: Array.isArray(data.summary),
+              length: Array.isArray(data.summary) ? data.summary.length : 0
+            });
+            
+            if (!transcriptData) {
+              await fetchWithCache('transcript', fetchTranscript, data.youtube_id || '', data.id);
+            }
+            
+            // Second priority: Fetch audio - needed for accessibility
+            if (!audioData) {
+              await fetchWithCache('audio', fetchAudio, data.youtube_id || '', data.id);
+            }
+            
+            // Lower priority: Fetch supplementary learning materials in parallel
+            await Promise.allSettled([
+              !mindmapData ? fetchWithCache('mindmap', fetchMindmap, data.youtube_id || '', data.id) : Promise.resolve(),
+              // Force a fresh fetch for flashcards data to resolve sample data issues
+              fetchWithCache('flashcards', fetchFlashcards, data.youtube_id || '', data.id, true),
+              // Force a fresh fetch for quiz data to resolve sample data issues
+              fetchWithCache('quiz', fetchQuiz, data.youtube_id || '', data.id, true)
+            ]);
+          } catch (error) {
+            console.error('Error loading content data:', error);
+          }
+        };
+        
+        fetchDataSequentially();
       }
     } catch (err) {
       console.error('Error fetching content:', err);
@@ -236,14 +473,62 @@ export default function ContentPage({ id }: ContentPageProps) {
           }
         }
       );
-      if (response && response.data && typeof response.data === 'object' && response.data !== null) {
-        const apiResponse = response.data as { data?: any };
-        if (apiResponse.data) {
-          setQuizData(apiResponse.data);
+      
+      if (response && response.data) {
+        console.log('Quiz API response:', response.data);
+        // Handle different response formats
+        let quizContent;
+        
+        if (typeof response.data === 'object' && response.data !== null) {
+          // Normal API response format with data property
+          if ('data' in response.data && response.data.data) {
+            quizContent = response.data.data;
+            console.log('Quiz data from response.data.data:', quizContent);
+          } 
+          // Direct quiz object format
+          else if ('quiz' in response.data) {
+            quizContent = response.data.quiz;
+            console.log('Quiz data from response.data.quiz:', quizContent);
+          }
+          // Fallback quiz format
+          else if ('questions' in response.data) {
+            quizContent = { quiz: response.data.questions };
+            console.log('Quiz data from response.data.questions:', quizContent);
+          } else {
+            // Try to use the response.data directly
+            quizContent = response.data;
+            console.log('Using response.data directly as quiz content:', quizContent);
+          }
+          
+          if (quizContent) {
+            console.log('Setting quiz data:', quizContent);
+            setQuizData(quizContent);
+            // Cache the successful response
+            localStorage.setItem(`n2n-content-${content_id}-quiz`, JSON.stringify({
+              data: quizContent,
+              timestamp: new Date().getTime()
+            }));
+          }
         }
       }
     } catch (error) {
       console.error("Error fetching quiz data:", error);
+      
+      // Check if we have a cached version
+      try {
+        if (typeof window !== 'undefined') {
+          const cached = localStorage.getItem(`n2n-content-${content_id}-quiz`);
+          if (cached) {
+            const { data: cachedData } = JSON.parse(cached);
+            if (cachedData) {
+              setQuizData(cachedData);
+              console.log('Using cached quiz data');
+            }
+          }
+        }
+      } catch (cacheError) {
+        console.warn('Error retrieving cached quiz:', cacheError);
+      }
     } finally {
       setQuizLoading(false);
     }
@@ -262,10 +547,40 @@ export default function ContentPage({ id }: ContentPageProps) {
           }
         }
       );
-      if (response && response.data && typeof response.data === 'object' && response.data !== null) {
-        const apiResponse = response.data as { data?: any };
-        if (apiResponse.data) {
-          setFlashcardsData(apiResponse.data);
+      if (response && response.data) {
+        console.log('Flashcards API response:', response.data);
+        let flashcardsContent;
+        
+        if (typeof response.data === 'object' && response.data !== null) {
+          // Normal API response format with data property
+          if ('data' in response.data && response.data.data) {
+            flashcardsContent = response.data.data;
+            console.log('Flashcards from response.data.data:', flashcardsContent);
+          } 
+          // Direct flashcards array format
+          else if (Array.isArray(response.data)) {
+            flashcardsContent = { flashcards: response.data };
+            console.log('Flashcards from array response:', flashcardsContent);
+          }
+          // Direct flashcards object format
+          else if ('flashcards' in response.data) {
+            flashcardsContent = response.data;
+            console.log('Flashcards from response.data.flashcards:', flashcardsContent);
+          } else {
+            // Try to use the response.data directly
+            flashcardsContent = response.data;
+            console.log('Using response.data directly as flashcards:', flashcardsContent);
+          }
+          
+          if (flashcardsContent) {
+            console.log('Setting flashcards data:', flashcardsContent);
+            setFlashcardsData(flashcardsContent);
+            // Cache the successful response
+            localStorage.setItem(`n2n-content-${content_id}-flashcards`, JSON.stringify({
+              data: flashcardsContent,
+              timestamp: new Date().getTime()
+            }));
+          }
         }
       }
     } catch (error) {
@@ -275,27 +590,106 @@ export default function ContentPage({ id }: ContentPageProps) {
     }
   };
   
-  // Fetch audio summary
+  // Define audio data interfaces at the component scope for reuse
+  interface AudioData {
+    audioUrl: string;
+    summaryText: string | any;
+  }
+
+  // Fetch audio summary with improved error handling
   const fetchAudio = async (youtube_id: string, content_id: string) => {
-    if (!content_id || !user?.token) return;
+    if (!content_id || !user?.token) {
+      console.error('Cannot fetch audio: missing content_id or token');
+      return;
+    }
+    
     try {
       setAudioLoading(true);
-      const response = await axios.get(
-        `/api/spaces/generate/audio?content_id=${content_id}`,
+      console.log('Fetching audio for content ID:', content_id);
+      
+      // Force refresh by adding a timestamp to avoid caching issues
+      const timestamp = new Date().getTime();
+      const apiUrl = `/api/spaces/generate/audio?content_id=${content_id}&_t=${timestamp}`;
+      console.log('Audio API URL:', apiUrl);
+      
+      // Define the exact API response structure from the server
+      interface AudioApiResponse {
+        message: string;
+        data: {
+          audioUrl: string;
+          summaryText: string | any;
+        }
+      }
+      
+      const response = await axios.get<AudioApiResponse>(
+        apiUrl,
         {
           headers: {
-            Authorization: `Bearer ${user?.token}`
+            Authorization: `Bearer ${user?.token}`,
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
           }
         }
       );
-      if (response && response.data && typeof response.data === 'object' && response.data !== null) {
-        const apiResponse = response.data as { data?: any };
-        if (apiResponse.data) {
-          setAudioData(apiResponse.data);
+      
+      console.log('Audio API response status:', response.status);
+      console.log('Audio API response message:', response.data.message);
+      
+      // Check if the response contains the data we need
+      if (response?.data?.data) {
+        // Access the audio data directly
+        const audioData = response.data.data;
+        
+        // Verify audioUrl exists and is a properly formatted string
+        if (!audioData.audioUrl || typeof audioData.audioUrl !== 'string') {
+          throw new Error('Invalid audio URL received from server');
         }
+        
+        // Check if audioUrl contains 'object Object' which indicates a stringification issue
+        if (audioData.audioUrl.includes('[object Object]') || audioData.audioUrl.includes('%5Bobject%20Object%5D')) {
+          throw new Error('Invalid audio URL format: contains object reference');
+        }
+        
+        // Ensure the audioUrl uses the proxy endpoint correctly
+        let audioUrl = audioData.audioUrl;
+        
+        // If this isn't already a proxied URL, it's likely a direct Google TTS URL
+        // which needs to be proxied to avoid CORS issues
+        if (audioUrl && typeof audioUrl === 'string' && !audioUrl.startsWith('/api/proxy/audio') && !audioUrl.includes('localhost') && !audioUrl.includes('127.0.0.1')) {
+          try {
+            // Test URL validity
+            new URL(audioUrl);
+            // Ensure URL is properly encoded
+            const encodedUrl = encodeURIComponent(audioUrl);
+            audioUrl = `/api/proxy/audio?url=${encodedUrl}&format=mp3&_t=${timestamp}`;
+            console.log('Converted to proxied URL:', audioUrl);
+          } catch (error) {
+            console.error('Invalid URL format:', audioUrl, error);
+            throw new Error(`Invalid audio URL format: ${audioUrl}`);
+          }
+        } else if (audioUrl && typeof audioUrl === 'string' && !audioUrl.includes('format=')) {
+          // Add format parameter to existing proxy URL if not present
+          audioUrl = `${audioUrl}${audioUrl.includes('?') ? '&' : '?'}format=mp3&_t=${timestamp}`;
+          console.log('Added format parameter to URL:', audioUrl);
+        }
+        
+        // Format the audio data object correctly
+        const formattedAudioData: AudioData = {
+          audioUrl: audioUrl,
+          summaryText: typeof audioData.summaryText === 'string' 
+            ? audioData.summaryText 
+            : String(audioData.summaryText || '')
+        };
+        
+        console.log('Formatted audio data:', formattedAudioData);
+        setAudioData(formattedAudioData);
+      } else {
+        console.warn('No data field in API response:', response.data);
+        throw new Error('No audio data received from server');
       }
     } catch (error) {
       console.error("Error fetching audio data:", error);
+      // Note: We don't have setAudioError in this component, errors are handled in AudioPlayer
     } finally {
       setAudioLoading(false);
     }
@@ -350,8 +744,15 @@ export default function ContentPage({ id }: ContentPageProps) {
         <LeftPanel 
           id={content.id}
           title={content.title}
-          summary={content.summary || []}
+          summary={Array.isArray(content.summary) ? content.summary : []}
         />
+        {/* Debug display - only in development */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="p-2 bg-blue-100 text-blue-800 text-xs">
+
+            length: {Array.isArray(content.summary) ? content.summary.length : 0}
+          </div>
+        )}
       </div>
       
       {/* Right Sidebar */}
@@ -369,6 +770,7 @@ export default function ContentPage({ id }: ContentPageProps) {
           audioLoading={audioLoading}
           transcriptData={transcriptData}
           transcriptLoading={transcriptLoading}
+          contentTitle={content.title}
         />
       </div>
     </div>

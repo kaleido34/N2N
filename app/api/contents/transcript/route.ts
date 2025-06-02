@@ -45,32 +45,70 @@ export async function GET(req: NextRequest) {
             );
         }
 
+        // Helper function to normalize transcript format
+        const normalizeTranscript = (transcript: any) => {
+            // If already an array of objects with text property, return as is
+            if (Array.isArray(transcript) && transcript.length > 0 && 
+                typeof transcript[0] === 'object' && 'text' in transcript[0]) {
+                return transcript;
+            }
+            
+            // If string, convert to array with single object
+            if (typeof transcript === 'string') {
+                return [{ text: transcript }];
+            }
+            
+            // If object with transcript property
+            if (transcript && typeof transcript === 'object' && 'transcript' in transcript) {
+                return normalizeTranscript(transcript.transcript);
+            }
+            
+            // If object with content property
+            if (transcript && typeof transcript === 'object' && 'content' in transcript) {
+                return normalizeTranscript(transcript.content);
+            }
+            
+            // If it's an object but not in the expected format, convert to string and wrap
+            if (transcript && typeof transcript === 'object') {
+                try {
+                    return [{ text: JSON.stringify(transcript) }];
+                } catch (e) {
+                    return [{ text: "Transcript format could not be processed" }];
+                }
+            }
+            
+            // Fallback for unexpected formats
+            return [{ text: "No transcript available" }];
+        };
+        
         // Return transcript based on content type
         if (content.content_type === "YOUTUBE_CONTENT" && content.youtubeContent) {
             return NextResponse.json({
                 data: {
-                    transcript: content.youtubeContent.transcript,
-                    youtube_id: content.youtubeContent.youtube_id
+                    transcript: normalizeTranscript(content.youtubeContent.transcript),
+                    youtube_id: content.youtubeContent.youtube_id,
+                    source_type: "youtube"
                 }
             });
         } else if (content.content_type === "DOCUMENT_CONTENT" && content.documentContent) {
             return NextResponse.json({
                 data: {
-                    transcript: content.documentContent.transcript
+                    transcript: normalizeTranscript(content.documentContent.transcript || content.documentContent.text),
+                    source_type: "document"
                 }
             });
         } else if (content.content_type === "AUDIO_CONTENT" && content.audioContent) {
             return NextResponse.json({
                 data: {
-                    transcript: content.audioContent.transcript
+                    transcript: normalizeTranscript(content.audioContent.transcript),
+                    source_type: "audio"
                 }
             });
         } else if (content.content_type === "IMAGE_CONTENT" && content.imageContent) {
-            // For image content, we might not have a transcript in the same format,
-            // but we can return the extracted text
             return NextResponse.json({
                 data: {
-                    transcript: [{ text: content.imageContent.text }]
+                    transcript: normalizeTranscript(content.imageContent.text),
+                    source_type: "image"
                 }
             });
         } else {
