@@ -745,6 +745,7 @@ export default function ContentPage({ id }: ContentPageProps) {
           id={content.id}
           title={content.title}
           summary={Array.isArray(content.summary) ? content.summary : []}
+          loading={summaryLoading}
         />
         {/* Debug display - only in development */}
         {process.env.NODE_ENV === 'development' && (

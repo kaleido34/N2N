@@ -31,8 +31,8 @@ export function MindmapDialog({ mindmapData, mindmapLoading, contentId, youtubeI
         breadthLimit: 1000, // Limit how broad the tree can be
         setsPortSpot: false // Don't set port spots automatically
       }),
-      // Prevent vertical scrolling when content fits
-      "allowVerticalScroll": false,
+      // Allow vertical scrolling for larger mindmaps
+      "allowVerticalScroll": true,
       "scrollMargin": 50, // Add margin around the content
       "padding": new go.Margin(80, 50, 20, 50), // Increased top padding to move diagram down
       "grid.visible": true, // Show grid

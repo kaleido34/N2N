@@ -229,7 +229,7 @@ export function QuizDialog({ quizData, quizLoading, contentId, youtubeId }: Quiz
                   {/* Force complete re-render of the RadioGroup component for each question */}
                   <div key={`radiogroup-container-${currentQuestionIndex}`}>
                     <RadioGroup 
-                      value={selectedOption === null ? undefined : selectedOption.toString()} 
+                      value={selectedOption === null || selectedOption === undefined ? undefined : selectedOption.toString()} 
                       onValueChange={(value) => {
                         const selectedIndex = parseInt(value);
                         

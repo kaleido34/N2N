@@ -4,6 +4,7 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 interface LeftPanelProps {
   id: string;
@@ -13,12 +14,14 @@ interface LeftPanelProps {
     content: string;
   }>;
   title: string;
+  loading?: boolean; // Added loading prop
 }
 
 export default function LeftPanel({ 
   id,
   summary,
-  title 
+  title,
+  loading = false // Default to false if not provided
 }: LeftPanelProps) {
   const router = useRouter();
   
@@ -141,7 +144,12 @@ export default function LeftPanel({
         <div className="p-4">
           <h2 className="text-xl font-semibold mb-3 text-[#5B4B8A] dark:text-white">{title}</h2>
           <div className="prose dark:prose-invert max-w-none px-2">
-            {summary && summary.length > 0 ? (
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-6">
+                <LoadingSpinner fullScreen={false} />
+                <p className="text-gray-500 mt-3">Loading summary...</p>
+              </div>
+            ) : summary && summary.length > 0 ? (
               <div className="space-y-1">
                 {summary.map((section, idx) => (
                   <React.Fragment key={idx}>
