@@ -34,9 +34,15 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="relative min-h-screen w-full bg-[#FAF7F8] dark:bg-gray-900">
-      <BackButton onClick={() => router.push("/")} className="absolute top-8 right-8" />
-      <div className="flex flex-col items-center justify-center min-h-screen w-full">
+    <main className="relative min-h-screen w-full bg-[#FAF7F8] dark:bg-gray-900 overflow-hidden">
+      {/* Decorative Ribbons */}
+      <div className="ribbon ribbon-1"></div>
+      <div className="ribbon ribbon-2"></div>
+      <div className="ribbon ribbon-3"></div>
+      <div className="ribbon ribbon-4"></div>
+      
+      <BackButton onClick={() => router.push("/")} className="absolute top-8 right-8 z-50" />
+      <div className="relative flex flex-col items-center justify-center min-h-screen w-full z-10">
         <h1 className="text-7xl font-extrabold text-center mb-10 text-[#5B4B8A] dark:text-white leading-none whitespace-nowrap">
           What are you learning today?
         </h1>

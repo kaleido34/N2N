@@ -188,3 +188,45 @@ body {
 .dashboard-page {
   overflow: hidden !important;
 }
+
+/* Ribbon Styles */
+.ribbon {
+    position: absolute;
+    height: 120px;
+    border-radius: 60px;
+    opacity: 0.9;
+    z-index: 0; /* Ensure ribbons are behind main content if needed */
+}
+
+.ribbon-1 {
+    width: 800px;
+    background: linear-gradient(45deg, #ff4444, #ff8800, #ffdd00);
+    top: 5%;
+    left: -10%;
+    transform: rotate(-15deg);
+}
+
+.ribbon-2 {
+    width: 600px;
+    background: linear-gradient(45deg, #ffaa00, #ffdd00, #88dd00);
+    top: 25%;
+    right: -15%;
+    transform: rotate(25deg);
+}
+
+.ribbon-3 {
+    width: 700px;
+    background: linear-gradient(45deg, #ff6600, #ff3300, #cc0066);
+    bottom: 15%;
+    left: -5%;
+    transform: rotate(12deg);
+}
+
+.ribbon-4 {
+    width: 500px;
+    background: linear-gradient(45deg, #ff3366, #cc0066, #6600cc);
+    bottom: 5%;
+    right: -8%;
+    transform: rotate(-20deg);
+}
+/* End Ribbon Styles */

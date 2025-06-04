@@ -20,6 +20,7 @@ import React from "react";
 import { toast } from "sonner";
 import { BackButton } from "@/components/ui/back-button";
 import { shouldAllowApiCall, markApiCallCompleted } from "@/lib/api-limiter";
+import { cn } from "@/lib/utils";
 
 interface ContentItem {
   id: string;
@@ -369,11 +370,23 @@ export default function SpacePage() {
               <div className="absolute top-2 right-2 z-10">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button 
-                      className="p-1 rounded-full hover:bg-black/20 dark:hover:bg-white/20 focus:outline-none transition-colors"
+                    <button
+                      className={cn(
+                        "p-1 rounded-full focus:outline-none transition-colors",
+                        item.type === "YOUTUBE_CONTENT"
+                          ? "hover:bg-orange-500/50" // Orange hover for white icon
+                          : "hover:bg-black/20 dark:hover:bg-white/20"
+                      )}
                       onClick={(e) => e.preventDefault()}
                     >
-                      <MoreVertical className="h-5 w-5 text-black dark:text-white" />
+                      <MoreVertical
+                        className={cn(
+                          "h-5 w-5",
+                          item.type === "YOUTUBE_CONTENT"
+                            ? "text-white"
+                            : "text-black dark:text-white"
+                        )}
+                      />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
