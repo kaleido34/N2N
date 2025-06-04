@@ -86,6 +86,13 @@ export function TermBuilderDialog({ contentId, youtubeId }: TermBuilderDialogPro
     setChainResult(null);
   };
 
+  const handleShowCorrectAnswer = () => {
+    if (currentChain) {
+      setUserChain(currentChain.correctChain);
+      setChainResult(null); // Reset result when showing answer
+    }
+  };
+
   const checkChain = () => {
     if (!currentChain) return;
 
@@ -95,23 +102,32 @@ export function TermBuilderDialog({ contentId, youtubeId }: TermBuilderDialogPro
 
     if (isCorrect) {
       setChainResult('correct');
-      const chainScore = 10; // Fixed 10 points for all chains
-      setScore(prev => prev + chainScore);
-      
+      // setTimeout for correct message to disappear
       setTimeout(() => {
-        if (currentChainIndex < totalChains - 1) {
-          setCurrentChainIndex(prev => prev + 1);
-          setUserChain([]);
-          setChainResult(null);
-        } else {
-          // All chains completed without toast
-        }
-      }, 2000);
+        setChainResult(null);
+      }, 800);
+      // Keep score calculation, but allow re-checking
+      // Only add score if it wasn't already marked as correct for this chain attempt
+      // To prevent adding score multiple times for the same correct chain, 
+      // we might need another state variable to track if score for current chain has been awarded.
+      // For now, let's assume score is added once when first correct.
+      // The main change here is to not auto-advance or clear the chain result immediately.
+
+      // If you want to allow re-checking but still auto-advance after a delay:
+      // setTimeout(() => {
+      //   if (currentChainIndex < totalChains - 1) {
+      //     setCurrentChainIndex(prev => prev + 1);
+      //     setUserChain([]);
+      //     setChainResult(null);
+      //   } else {
+      //     // All chains completed
+      //   }
+      // }, 2000);
     } else {
       setChainResult('incorrect');
       setTimeout(() => {
         setChainResult(null);
-      }, 300);
+      }, 600); // Increased timeout for incorrect message
     }
   };
 
@@ -276,8 +292,8 @@ export function TermBuilderDialog({ contentId, youtubeId }: TermBuilderDialogPro
 
                 {/* Chain Result */}
                 {chainResult && (
-                  <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
-                    <div className={`rounded-lg p-4 border max-w-[300px] ${
+                  <div className={`fixed inset-0 flex items-center justify-center z-50`}>
+                    <div className={`rounded-lg p-4 border max-w-[300px] shadow-xl ${ 
                       chainResult === 'correct' 
                         ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
                         : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
@@ -305,7 +321,10 @@ export function TermBuilderDialog({ contentId, youtubeId }: TermBuilderDialogPro
 
                 {/* Available Concepts */}
                 <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-                  <h4 className="font-semibold text-[#5B4B8A] dark:text-white mb-3">Available Concepts:</h4>
+                  <div className="flex justify-between items-center mb-3">
+                    <h4 className="font-semibold text-[#5B4B8A] dark:text-white">Available Concepts:</h4>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">(Note: Not all available concepts may be part of the correct chain)</p>
+                  </div>
                   <div className="grid grid-cols-3 gap-2">
                     {availableTermsForUser.map((term, index) => (
                       <button
@@ -320,11 +339,11 @@ export function TermBuilderDialog({ contentId, youtubeId }: TermBuilderDialogPro
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex gap-3 justify-center">
+                <div className="flex gap-3 justify-center pt-4">
                   <Button 
                     onClick={checkChain} 
-                    disabled={userChain.length === 0 || chainResult === 'correct'}
-                    className="bg-[#8B7AD6] hover:bg-[#7B6AC6] text-white font-semibold py-2 px-6 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm w-32"
+                    disabled={userChain.length === 0}
+                    className="bg-[#8B7AD6] hover:bg-[#7B6AC6] text-white font-semibold py-2 px-6 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm w-36 h-10"
                   >
                     Check Chain
                   </Button>
@@ -332,9 +351,16 @@ export function TermBuilderDialog({ contentId, youtubeId }: TermBuilderDialogPro
                     onClick={clearChain} 
                     variant="outline"
                     disabled={userChain.length === 0}
-                    className="py-2 px-6 text-sm w-32"
+                    className="py-2 px-6 text-sm w-36 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 h-10"
                   >
                     Clear Chain
+                  </Button>
+                  <Button
+                    onClick={handleShowCorrectAnswer}
+                    disabled={!currentChain || chainResult === 'correct'}
+                    className="bg-[#8B7AD6] hover:bg-[#7B6AC6] text-white font-semibold py-2 px-6 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm w-36 h-10"
+                  >
+                    Check Answer
                   </Button>
                 </div>
               </div>

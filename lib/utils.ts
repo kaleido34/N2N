@@ -504,7 +504,7 @@ export const generateMindMap = async (transcripts: string): Promise<MindMapData>
     chunks.push(words.slice(i, i + 1000).join(' '));
   }
 
-    const prompt = `Create a hierarchical mind map from educational content in GoJS-compatible JSON format.
+  const prompt = `Create a hierarchical mind map from educational content in GoJS-compatible JSON format.
 
 REQUIRED JSON STRUCTURE:
 {
@@ -556,41 +556,109 @@ GUIDELINES:
 - Include relationship types: "contains", "includes", "leads_to", or "relates_to"
 - Ensure valid JSON that can be parsed with JSON.parse()`;
 
-
-
   // Import the parseAiResponse helper
   const { parseAiResponse } = await import('./ai-utils');
   
-  // Process chunks sequentially
-  let mindMapData: MindMapData | null = null;
-  
+  let finalMindMapData: MindMapData = { nodes: [], links: [], from: -1, to: -1 }; // Adjusted MindMapData type usage
+  let nextNodeKeyOffset = 1; // Start with 1, adjust based on max key after each chunk
+  let actualRootKey: number | null = null;
+
   try {
-    for (const chunk of chunks) {
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
       const generateContent = await model.generateContent([prompt, chunk]);
       const responseText = generateContent.response.text();
       
-      // Parse the response using our helper function
       const chunkData = parseAiResponse<MindMapData>(responseText);
+
+      if (!chunkData || !chunkData.nodes || !chunkData.links) {
+        console.warn(`Skipping chunk ${i} due to invalid data format.`);
+        continue;
+      }
       
-      if (!mindMapData) {
-        mindMapData = chunkData;
-      } else {
-        // Merge new nodes and links, avoiding duplicates
-        const existingKeys = new Set(mindMapData.nodes.map((n: MindMapNode) => n.key));
-        const newNodes = chunkData.nodes.filter((n: MindMapNode) => !existingKeys.has(n.key));
-        mindMapData.nodes.push(...newNodes);
-        mindMapData.links.push(...chunkData.links);
+      const keyMapping = new Map<number, number>();
+      let currentChunkRootOriginalKey: number | null = null;
+
+      // Process nodes from the current chunk
+      chunkData.nodes.forEach(node => {
+        const originalKey = node.key;
+        if (i === 0) { // First chunk
+          keyMapping.set(originalKey, originalKey);
+          node.key = originalKey; // No offset for the first chunk
+          if (node.category === 'root' || originalKey === 1) {
+            actualRootKey = originalKey;
+          }
+        } else { // Subsequent chunks
+          const newKey = originalKey + nextNodeKeyOffset;
+          keyMapping.set(originalKey, newKey);
+          node.key = newKey;
+          if (node.category === 'root' || originalKey === 1) { // This was the root of the sub-chunk
+            currentChunkRootOriginalKey = originalKey; // Store its *original* key from chunkData
+            node.category = 'main'; // Re-categorize as a main branch
+          }
+        }
+      });
+
+      // Add processed nodes to final data, avoiding duplicates by new key
+      const existingKeysInFinal = new Set(finalMindMapData.nodes.map(n => n.key));
+      chunkData.nodes.forEach(node => {
+        if (!existingKeysInFinal.has(node.key)) {
+          finalMindMapData.nodes.push(node);
+          existingKeysInFinal.add(node.key);
+        }
+      });
+      
+      // Process links from the current chunk
+      chunkData.links.forEach(link => {
+        const newFrom = keyMapping.get(link.from);
+        const newTo = keyMapping.get(link.to);
+        if (newFrom !== undefined && newTo !== undefined) {
+          finalMindMapData.links.push({ from: newFrom, to: newTo });
+        }
+      });
+
+      // If this is a subsequent chunk and we identified its original root,
+      // link it to the actualRootKey of the first chunk.
+      if (i > 0 && currentChunkRootOriginalKey !== null && actualRootKey !== null) {
+        const mappedChunkRootKey = keyMapping.get(currentChunkRootOriginalKey);
+        if (mappedChunkRootKey !== undefined) {
+           // Ensure this new main branch node exists in finalMindMapData.nodes
+           // (it should have been added in the node processing loop)
+           const chunkRootNodeExists = finalMindMapData.nodes.some(n => n.key === mappedChunkRootKey);
+           if(chunkRootNodeExists){
+            finalMindMapData.links.push({ from: actualRootKey, to: mappedChunkRootKey });
+           } else {
+             console.warn(`Root node for chunk ${i} (original key ${currentChunkRootOriginalKey}, mapped to ${mappedChunkRootKey}) not found in final nodes. Cannot link to main root.`);
+           }
+        }
+      }
+      
+      // Update offset for the next chunk based on the maximum key used so far
+      if (finalMindMapData.nodes.length > 0) {
+        nextNodeKeyOffset = Math.max(...finalMindMapData.nodes.map(n => n.key)) + 100; // Add a buffer
+      } else if (chunkData.nodes.length > 0) { // If finalMindMapData was empty, use current chunk's max
+        nextNodeKeyOffset = Math.max(...chunkData.nodes.map(n => n.key)) + 100;
       }
     }
     
-    if (!mindMapData) {
-      throw new Error('Failed to generate mind map data');
+    // De-duplicate links
+    const uniqueLinks = Array.from(new Set(finalMindMapData.links.map(link => JSON.stringify({from: link.from, to: link.to}))))
+                          .map(strLink => JSON.parse(strLink) as { from: number; to: number });
+    finalMindMapData.links = uniqueLinks;
+
+    if (finalMindMapData.nodes.length === 0) {
+      throw new Error('Failed to generate any mind map nodes after processing all chunks.');
     }
     
-    return mindMapData;
+    return finalMindMapData;
   } catch (error) {
     console.error('Error generating mind map:', error);
-    throw new Error('Failed to generate mind map. Please try again.');
+    // Fallback to a very simple mind map on error to prevent UI crash
+    return {
+      nodes: [{ key: 1, text: "Error Generating Mind Map", category: "root" }],
+      links: [],
+      from: -1, to: -1 // satisfy MindMapData type
+    };
   }
 };
 
