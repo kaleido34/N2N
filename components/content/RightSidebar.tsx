@@ -28,7 +28,7 @@ import { useRouter } from "next/navigation";
 import { QuizDialog } from "./QuizDialog";
 import { FlashcardsDialog } from "./FlashcardsDialog";
 import { MindmapDialog } from "./MindmapDialog";
-import { GamesDialog } from "./GamesDialog";
+import { GamesDialog } from "./ConceptMatchDialog";
 import { AudioPlayer } from "./AudioPlayer";
 import { TranscriptsDialog } from "./TranscriptsDialog";
 

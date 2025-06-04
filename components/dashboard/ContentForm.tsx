@@ -7,7 +7,7 @@ import { useSpaces } from "@/hooks/space-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { FileText, Image as ImageIcon, Music, Paperclip, Loader2, ArrowRight, Video } from "lucide-react";
+import { FileText, Image as ImageIcon, Music, Paperclip, Loader2, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -264,15 +264,6 @@ export function ContentForm() {
               >
                 <Music className="h-4 w-4" /> Audio
               </DropdownMenuItem>
-              <DropdownMenuItem 
-                className="flex items-center gap-2 cursor-pointer dark:text-white" 
-                onClick={() => { 
-                  fileInputRef.current?.setAttribute('accept', 'video/*'); 
-                  fileInputRef.current?.click(); 
-                }}
-              >
-                <Video className="h-4 w-4" /> Video
-              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -293,7 +284,7 @@ export function ContentForm() {
         ref={fileInputRef}
         onChange={handleFileChange}
         className="hidden"
-        accept="application/pdf,image/*,audio/*,video/*"
+        accept="application/pdf,image/*,audio/*"
       />
     </form>
   );

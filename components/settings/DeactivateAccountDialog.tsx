@@ -41,15 +41,15 @@ export function DeactivateAccountDialog({
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="destructive">Delete Account</Button>
+        <Button className="bg-[#E58C5A] hover:bg-[#d94d1a] text-white border-none">Delete Account</Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <Form {...deactivateForm}>
           <form onSubmit={deactivateForm.handleSubmit(onDeactivate)}>
             <AlertDialogHeader>
-              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogTitle>Delete Account?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete your account and remove all your data from our servers.
+                This will permanently delete your account and all data. This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <div className="my-6">
@@ -72,7 +72,7 @@ export function DeactivateAccountDialog({
               <AlertDialogAction asChild>
                 <Button
                   type="submit"
-                  variant="destructive"
+                  className="bg-[#E58C5A] hover:bg-[#d94d1a] text-white border-none"
                   disabled={isDeactivating}
                 >
                   {isDeactivating && (

@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { Video, FileText, FileAudio, FileImage, File } from "lucide-react";
+import { Video, FileText, FileAudio, FileImage, File, Headphones } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/auth-provider";
 import { useSpaces } from "@/hooks/space-provider";
@@ -318,21 +318,30 @@ export default function SpacePage() {
                       className="object-cover w-full h-full"
                     />
                     <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors" />
-                    <Video className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-8 w-8 text-white" />
+                    {/* Small rectangular YT play icon overlay with white triangle */}
+                    <div className="absolute top-2 left-2 z-10 flex items-center justify-center rounded-lg border-2 border-white bg-[#FF4B4B] w-9 h-7 shadow-md">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" className="h-4 w-4">
+                        <polygon points="5 3 19 12 5 21 5 3" />
+                      </svg>
+                    </div>
                   </div>
                 ) : (
-                  <div className="aspect-video bg-muted flex items-center justify-center rounded-md bg-[#2D1B69] dark:bg-[#2D1B69]">
-                    {item.type === 'PDF' || item.type === 'PDF_CONTENT' ? (
-                      <FileText className="h-12 w-12 text-white" />
-                    ) : item.type === 'IMAGE' || item.type === 'IMAGE_CONTENT' ? (
-                      <FileImage className="h-12 w-12 text-white" />
-                    ) : item.type === 'AUDIO' || item.type === 'AUDIO_CONTENT' ? (
-                      <FileAudio className="h-12 w-12 text-white" />
-                    ) : item.type === 'YOUTUBE_CONTENT' ? (
-                      <Video className="h-12 w-12 text-white" />
-                    ) : (
-                      <File className="h-12 w-12 text-white" />
-                    )}
+                  <div className="aspect-video flex items-center justify-center rounded-md bg-transparent">
+                    <div className="flex items-center justify-center w-28 h-28 rounded-full border-4 border-white shadow-lg" style={{ backgroundColor:
+                      item.type === 'PDF' || item.type === 'PDF_CONTENT' ? '#4285F4' :
+                      item.type === 'IMAGE' || item.type === 'IMAGE_CONTENT' ? '#1fd655' :
+                      item.type === 'AUDIO' || item.type === 'AUDIO_CONTENT' ? '#A259FF' :
+                      '#2D1B69' }}>
+                      {item.type === 'PDF' || item.type === 'PDF_CONTENT' ? (
+                        <FileText className="w-20 h-20 text-white" />
+                      ) : item.type === 'IMAGE' || item.type === 'IMAGE_CONTENT' ? (
+                        <FileImage className="w-20 h-20 text-white" />
+                      ) : item.type === 'AUDIO' || item.type === 'AUDIO_CONTENT' ? (
+                        <Headphones className="w-20 h-20 text-white" />
+                      ) : (
+                        <File className="w-20 h-20 text-white" />
+                      )}
+                    </div>
                   </div>
                 )}
                 <div className="mt-2">
