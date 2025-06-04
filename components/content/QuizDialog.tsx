@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -129,7 +129,14 @@ export function QuizDialog({ quizData, quizLoading, contentId, youtubeId }: Quiz
   }
   
   // Store user answers for each question separately
-  const [userAnswers, setUserAnswers] = useState<(number | null)[]>(new Array(questions.length).fill(null));
+  const [userAnswers, setUserAnswers] = useState<(number | null)[]>(() => new Array(questions.length).fill(null));
+
+  useEffect(() => {
+    // Only reset userAnswers if the length of questions changes
+    if (userAnswers.length !== questions.length) {
+      setUserAnswers(new Array(questions.length).fill(null));
+    }
+  }, [questions.length]);
   
   const currentQuestion = questions[currentQuestionIndex] || sampleQuestions[0];
   const totalQuestions = questions.length;
@@ -229,7 +236,7 @@ export function QuizDialog({ quizData, quizLoading, contentId, youtubeId }: Quiz
                   {/* Force complete re-render of the RadioGroup component for each question */}
                   <div key={`radiogroup-container-${currentQuestionIndex}`}>
                     <RadioGroup 
-                      value={selectedOption === null || selectedOption === undefined ? undefined : selectedOption.toString()} 
+                      value={selectedOption !== null && selectedOption !== undefined ? selectedOption.toString() : undefined} 
                       onValueChange={(value) => {
                         const selectedIndex = parseInt(value);
                         

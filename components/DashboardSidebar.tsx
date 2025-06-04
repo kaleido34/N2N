@@ -225,7 +225,9 @@ export default function DashboardSidebar({ minimized, setMinimized }: { minimize
                   key={lesson.id}
                   className="truncate text-xs text-[#232323] dark:text-white px-2 py-1 group hover:bg-[#f3f0ff] dark:hover:bg-[#23223a] rounded transition cursor-pointer pl-3 flex items-center justify-between"
                 >
-                  <span className="truncate max-w-[160px]">{lesson.title || 'Untitled'}</span>
+                  <span className="truncate max-w-[160px]" title={lesson.title || lesson.filename || 'Untitled'}>
+                    {lesson.title || lesson.filename || 'Untitled'}
+                  </span>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <DropdownMenuIconButton aria-label="Lesson options">

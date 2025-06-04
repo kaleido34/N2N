@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { Video, FileText } from "lucide-react";
+import { Video, FileText, FileAudio, FileImage, File } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/auth-provider";
 import { useSpaces } from "@/hooks/space-provider";
@@ -321,13 +321,23 @@ export default function SpacePage() {
                     <Video className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-8 w-8 text-white" />
                   </div>
                 ) : (
-                  <div className="aspect-video bg-muted flex items-center justify-center rounded-md">
-                    <FileText className="h-8 w-8 text-white dark:text-white" />
+                  <div className="aspect-video bg-muted flex items-center justify-center rounded-md bg-[#2D1B69] dark:bg-[#2D1B69]">
+                    {item.type === 'PDF' || item.type === 'PDF_CONTENT' ? (
+                      <FileText className="h-12 w-12 text-white" />
+                    ) : item.type === 'IMAGE' || item.type === 'IMAGE_CONTENT' ? (
+                      <FileImage className="h-12 w-12 text-white" />
+                    ) : item.type === 'AUDIO' || item.type === 'AUDIO_CONTENT' ? (
+                      <FileAudio className="h-12 w-12 text-white" />
+                    ) : item.type === 'YOUTUBE_CONTENT' ? (
+                      <Video className="h-12 w-12 text-white" />
+                    ) : (
+                      <File className="h-12 w-12 text-white" />
+                    )}
                   </div>
                 )}
                 <div className="mt-2">
-                  <h3 className="font-semibold text-gray-900 dark:text-white group-hover:text-primary transition-colors text-base mb-0.5 truncate" title={item.title || "Untitled"}>
-                    {item.title || "Untitled"}
+                  <h3 className="font-semibold text-gray-900 dark:text-white group-hover:text-primary transition-colors text-base mb-0.5 truncate" title={item.title || item.filename || "Untitled"}>
+                    {item.title || item.filename || "Untitled"}
                   </h3>
                   <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
                     {item.createdAt

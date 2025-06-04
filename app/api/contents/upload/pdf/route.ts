@@ -36,24 +36,29 @@ export async function POST(req: NextRequest) {
     return new Response("No userId provided", { status: 400 });
   }
 
-  // If no spaceId, find or create a Default space for this user
+  // Find or create Personal Workspace for this user
   let finalSpaceId = typeof spaceId === "string" && spaceId ? spaceId : undefined;
   if (!finalSpaceId) {
-    let defaultSpace = await prisma.space.findFirst({
+    let personalWorkspace = await prisma.space.findFirst({
       where: {
         user_id: userId,
-        space_name: "Default",
+        space_name: {
+          contains: "Personal",
+          mode: 'insensitive'
+        },
       },
     });
-    if (!defaultSpace) {
-      defaultSpace = await prisma.space.create({
+    
+    if (!personalWorkspace) {
+      // If no personal workspace exists, create one
+      personalWorkspace = await prisma.space.create({
         data: {
           user_id: userId,
-          space_name: "Default",
+          space_name: "Personal Workspace",
         },
       });
     }
-    finalSpaceId = defaultSpace.space_id;
+    finalSpaceId = personalWorkspace.space_id;
   }
 
   // Extract text from PDF using Python server
@@ -109,12 +114,38 @@ export async function POST(req: NextRequest) {
   // --- Generate AI features ---
   let quiz = null, flashcards = null, mindmap = null, summary = null;
   try {
-    [quiz, flashcards, mindmap, summary] = await Promise.all([
+    // Generate all AI features in parallel
+    const results = await Promise.all([
       generateQuiz(transcriptText),
       generateFlashCards(transcriptText),
       generateMindMap(transcriptText),
-      summarizeChunks(transcriptText),
+      (async (): Promise<string | null> => {
+        try {
+          let summaryData = await summarizeChunks(transcriptText);
+          if (!summaryData) return null;
+          
+          // Ensure the summary is properly stringified before saving
+          if (summaryData) {
+            try {
+              // If it's already a string, parse it to ensure it's valid JSON
+              const parsed = typeof summaryData === 'string' ? JSON.parse(summaryData) : summaryData;
+              // Then re-stringify it to ensure consistent format
+              return JSON.stringify(parsed);
+            } catch (e) {
+              console.error('Error processing summary:', e);
+              return null;
+            }
+          }
+          return null;
+        } catch (e) {
+          console.error('Error generating summary:', e);
+          return null;
+        }
+      })(),
     ]);
+    
+    [quiz, flashcards, mindmap, summary] = results;
+    
   } catch (err) {
     // If AI fails, continue with what we have
     console.error("AI generation failed:", err);
@@ -139,10 +170,10 @@ export async function POST(req: NextRequest) {
       },
       metadata: {
         create: {
-          summary: summary || null,
-          flashcards: flashcards ? JSON.parse(flashcards) : null,
-          mindmap: mindmap ? JSON.parse(mindmap) : null,
-          quiz: quiz ? JSON.parse(quiz) : null,
+          summary: summary ? JSON.stringify(summary) : null,
+          flashcards: flashcards ? (typeof flashcards === 'string' ? JSON.parse(flashcards) : flashcards) : null,
+          mindmap: mindmap ? (typeof mindmap === 'string' ? JSON.parse(mindmap) : mindmap) : null,
+          quiz: quiz ? (typeof quiz === 'string' ? JSON.parse(quiz) : quiz) : null,
         },
       },
       users: {
@@ -173,5 +204,24 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  return new Response(JSON.stringify({ contentId, spaceId: finalSpaceId }), { status: 200 });
+  // Format the response to match the YouTube content creation API
+  // This ensures consistent handling in the frontend
+  return new Response(JSON.stringify({
+    status: "success",
+    data: {
+      space_id: finalSpaceId,
+      content_id: contentId,
+      type: "DOCUMENT_CONTENT",
+      title: filename || "PDF Document"
+    },
+    // Also include at top level for easier access by the ContentForm component
+    space_id: finalSpaceId,
+    content_id: contentId,
+    content: {
+      space_id: finalSpaceId,
+      id: contentId,
+      type: "DOCUMENT_CONTENT",
+      title: filename || "PDF Document"
+    }
+  }), { status: 200 });
 }

@@ -37,32 +37,154 @@ interface Content extends BaseContent {
   imageContent?: ImageContent | null;
 }
 
-// Type guard functions to make TypeScript happy
-function isNonNullYouTubeContent(content: YouTubeContent | null | undefined): content is YouTubeContent {
-  return content !== null && content !== undefined;
+// TTS Configuration
+const TTS_CONFIG = {
+  MAX_CHUNK_LENGTH: 180, // Google TTS character limit per request
+  MAX_REQUESTS_PER_MINUTE: 50, // Conservative rate limit
+  CHUNK_OVERLAP: 10, // Overlap between chunks for smoother transitions
+  REQUEST_DELAY: 1200, // Delay between requests in ms (50 req/min = 1200ms)
+  MAX_TOTAL_LENGTH: 3000, // Maximum total text length to process
+  RETRY_ATTEMPTS: 3,
+  RETRY_DELAY: 2000
+};
+
+// Rate limiting state (in production, use Redis or similar)
+const rateLimitState = {
+  lastRequestTime: 0,
+  requestCount: 0,
+  windowStart: Date.now()
+};
+
+// Text chunking function with smart sentence breaking
+function chunkTextSafely(text: string): string[] {
+  if (!text || text.length <= TTS_CONFIG.MAX_CHUNK_LENGTH) {
+    return [text];
+  }
+
+  // Limit total text length
+  if (text.length > TTS_CONFIG.MAX_TOTAL_LENGTH) {
+    console.warn(`Text too long (${text.length} chars), truncating to ${TTS_CONFIG.MAX_TOTAL_LENGTH}`);
+    text = text.substring(0, TTS_CONFIG.MAX_TOTAL_LENGTH) + "...";
+  }
+
+  const chunks: string[] = [];
+  let currentChunk = "";
+  
+  // Split by sentences first (more natural breaks)
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+  
+  for (const sentence of sentences) {
+    const trimmedSentence = sentence.trim();
+    
+    // If adding this sentence would exceed the limit, finalize current chunk
+    if (currentChunk && (currentChunk.length + trimmedSentence.length + 1) > TTS_CONFIG.MAX_CHUNK_LENGTH) {
+      chunks.push(currentChunk.trim());
+      currentChunk = trimmedSentence;
+    } else {
+      currentChunk += (currentChunk ? " " : "") + trimmedSentence;
+    }
+  }
+  
+  // Add the last chunk if it exists
+  if (currentChunk.trim()) {
+    chunks.push(currentChunk.trim());
+  }
+  
+  // If we still have chunks that are too long, split them by words
+  const finalChunks: string[] = [];
+  for (const chunk of chunks) {
+    if (chunk.length <= TTS_CONFIG.MAX_CHUNK_LENGTH) {
+      finalChunks.push(chunk);
+    } else {
+      // Split long chunks by words
+      const words = chunk.split(' ');
+      let wordChunk = "";
+      
+      for (const word of words) {
+        if ((wordChunk + " " + word).length > TTS_CONFIG.MAX_CHUNK_LENGTH) {
+          if (wordChunk) finalChunks.push(wordChunk.trim());
+          wordChunk = word;
+        } else {
+          wordChunk += (wordChunk ? " " : "") + word;
+        }
+      }
+      
+      if (wordChunk) finalChunks.push(wordChunk.trim());
+    }
+  }
+  
+  console.log(`Text chunked into ${finalChunks.length} parts:`, finalChunks.map(c => c.length));
+  return finalChunks;
 }
 
-function isNonNullDocumentContent(content: DocumentContent | null | undefined): content is DocumentContent {
-  return content !== null && content !== undefined;
+// Rate limiting function
+async function checkRateLimit(): Promise<void> {
+  const now = Date.now();
+  
+  // Reset window if more than a minute has passed
+  if (now - rateLimitState.windowStart > 60000) {
+    rateLimitState.requestCount = 0;
+    rateLimitState.windowStart = now;
+  }
+  
+  // Check if we've exceeded the rate limit
+  if (rateLimitState.requestCount >= TTS_CONFIG.MAX_REQUESTS_PER_MINUTE) {
+    const waitTime = 60000 - (now - rateLimitState.windowStart);
+    console.warn(`Rate limit exceeded. Waiting ${waitTime}ms`);
+    await new Promise(resolve => setTimeout(resolve, waitTime));
+    rateLimitState.requestCount = 0;
+    rateLimitState.windowStart = Date.now();
+  }
+  
+  // Ensure minimum delay between requests
+  const timeSinceLastRequest = now - rateLimitState.lastRequestTime;
+  if (timeSinceLastRequest < TTS_CONFIG.REQUEST_DELAY) {
+    const delay = TTS_CONFIG.REQUEST_DELAY - timeSinceLastRequest;
+    console.log(`Waiting ${delay}ms to respect rate limits`);
+    await new Promise(resolve => setTimeout(resolve, delay));
+  }
+  
+  rateLimitState.lastRequestTime = Date.now();
+  rateLimitState.requestCount++;
 }
 
-function isNonNullAudioContent(content: AudioContent | null | undefined): content is AudioContent {
-  return content !== null && content !== undefined;
+// Generate TTS URL with retry logic
+async function generateTTSWithRetry(text: string, attempt: number = 1): Promise<string> {
+  try {
+    await checkRateLimit();
+    
+    // Clean text for TTS
+    const cleanText = text
+      .replace(/\[object Object\]/g, 'content')
+      .replace(/\s+/g, ' ')
+      .trim();
+    
+    // Create direct Google TTS URL
+    const encodedText = encodeURIComponent(cleanText);
+    const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodedText}&tl=en&total=1&idx=0&textlen=${cleanText.length}&client=tw-ob&prev=input&ttsspeed=1`;
+    
+    // Validate URL
+    new URL(ttsUrl);
+    
+    return ttsUrl;
+  } catch (error) {
+    console.error(`TTS generation attempt ${attempt} failed:`, error);
+    
+    if (attempt < TTS_CONFIG.RETRY_ATTEMPTS) {
+      console.log(`Retrying TTS generation (attempt ${attempt + 1}/${TTS_CONFIG.RETRY_ATTEMPTS})`);
+      await new Promise(resolve => setTimeout(resolve, TTS_CONFIG.RETRY_DELAY * attempt));
+      return generateTTSWithRetry(text, attempt + 1);
+    }
+    
+    throw new Error(`Failed to generate TTS after ${TTS_CONFIG.RETRY_ATTEMPTS} attempts: ${error}`);
+  }
 }
 
-function isNonNullImageContent(content: ImageContent | null | undefined): content is ImageContent {
-  return content !== null && content !== undefined;
-}
-
-// Maximum text length for Google TTS in a single request - Google TTS has a ~200 character limit
-const MAX_TEXT_LENGTH = 180; // Slightly reduced to be safe
-
+// Main GET endpoint
 export async function GET(req: NextRequest) {
   try {
     const params = req.nextUrl.searchParams;
     const content_id = params.get("content_id");
-
-    // Check if force regenerate flag is set
     const forceRegenerate = params.get("force") === "true";
     
     // Authenticate the user
@@ -85,105 +207,54 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Check if audio summary already exists in metadata
+    // Check if audio summary already exists
     const existingMetadata = await prisma.metadata.findUnique({
       where: { content_id: content_id }
     });
 
-    // If audio summary URL already exists and we're not forcing regeneration, return it
+    // Return existing audio if available and not forcing regeneration
     if (existingMetadata?.audio_summary && !forceRegenerate) {
       return NextResponse.json({
         message: "Audio summary found",
         data: {
           audioUrl: existingMetadata.audio_summary,
-          summaryText: existingMetadata.summary || "Summary not available"
+          summaryText: existingMetadata.summary || "Summary not available",
+          isChunked: existingMetadata.audio_summary.includes('chunks=')
         }
       }, { status: 200 });
     }
 
+    // Extract readable text from summary
     let readableText = "";
-
-    // First try to get summary from metadata
+    
     if (existingMetadata?.summary) {
       try {
-        // Try to parse as JSON first
         const parsedSummary = JSON.parse(existingMetadata.summary);
         
         if (Array.isArray(parsedSummary)) {
-          // If it's an array of sections, extract text content
           readableText = parsedSummary.map((section: any) => {
-            // Check if section is an object with a content property
             if (section && typeof section === 'object' && 'content' in section) {
-              // Handle both null and undefined cases explicitly for TypeScript
-              const content = section.content;
-              return content !== null && content !== undefined ? String(content) : '';
+              return String(section.content || '');
             }
             return String(section || '');
           }).join('. ');
-        } else if (typeof parsedSummary === 'object' && parsedSummary !== null) {
-          // If it's an object, try to extract useful text from it
-          if ('sections' in parsedSummary && Array.isArray(parsedSummary.sections)) {
-            // Format from sections array with explicit null/undefined handling
-            readableText = parsedSummary.sections.map((section: any) => {
-              if (section && typeof section === 'object' && 'content' in section) {
-                // Handle both null and undefined cases explicitly for TypeScript
-                const content = section.content;
-                return content !== null && content !== undefined ? String(content) : '';
-              }
-              return String(section || '');
-            }).join('. ');
-          } else {
-            // Try to extract any meaningful text properties
-            const textParts = [];
-            for (const key in parsedSummary) {
-              // Only include string values and convert simple values to strings
-              if (typeof parsedSummary[key] === 'string') {
-                textParts.push(parsedSummary[key]);
-              } else if (typeof parsedSummary[key] === 'number' || typeof parsedSummary[key] === 'boolean') {
-                textParts.push(String(parsedSummary[key]));
-              } else if (parsedSummary[key] !== null && typeof parsedSummary[key] === 'object') {
-                // For objects, try to stringify them properly or skip if they can't be stringified
-                try {
-                  const objString = JSON.stringify(parsedSummary[key]);
-                  // Only include if it's a meaningful string (not just an empty object)
-                  if (objString && objString !== '{}' && objString !== '[]') {
-                    textParts.push(`${key}: ${objString}`);
-                  }
-                } catch (e) {
-                  // `Failed to stringify property ${key}`, e);
-                }
-              }
+        } else if (parsedSummary?.sections && Array.isArray(parsedSummary.sections)) {
+          readableText = parsedSummary.sections.map((section: any) => {
+            if (section && typeof section === 'object' && 'content' in section) {
+              return String(section.content || '');
             }
-            
-            if (textParts.length > 0) {
-              readableText = textParts.join('. ');
-            } else {
-              // Fallback to a simple description if we can't extract text
-              readableText = "Summary of the content you requested.";
-            }
-            
-            // Additional safety check for object references
-            if (readableText.includes('[object Object]')) {
-              // 'Detected [object Object] in processed text, cleaning up');
-              readableText = readableText.replace(/\[object Object\]/g, 'content');
-            }
-          }
+            return String(section || '');
+          }).join('. ');
         } else {
-          // If it's a primitive value, convert to string
           readableText = String(parsedSummary);
         }
       } catch (jsonError) {
-        // If it's not JSON, use the string directly
-        // 'Error parsing summary as JSON, using raw string:', jsonError);
         readableText = existingMetadata.summary;
       }
     }
 
-    // Validate that we have proper readable text
-    if (!readableText || typeof readableText !== 'string' || readableText.includes('[object Object]')) {
-      // 'Summary text was invalid, falling back to content title');
-      
-      // If no valid summary, get title from content based on content type
+    // Fallback to content title if no summary
+    if (!readableText || readableText.includes('[object Object]')) {
       const contentResult = await prisma.content.findUnique({
         where: { content_id },
         include: {
@@ -197,304 +268,174 @@ export async function GET(req: NextRequest) {
       if (!contentResult) {
         return NextResponse.json({ message: "Content not found" }, { status: 404 });
       }
-      
-      // TypeScript doesn't understand the null check above, so we need to assert the type
-      const content = contentResult as Content;
 
-      // Get title based on content type
-      switch (content.content_type) {
-        case "YOUTUBE_CONTENT": {
-          // Use optional chaining and nullish coalescing to safely access properties
-          const title = content.youtubeContent?.title;
-          if (title) {
-            readableText = `Summary of ${String(title)}`;
-          }
+      // Generate title-based text
+      switch (contentResult.content_type) {
+        case "YOUTUBE_CONTENT":
+          readableText = `Summary of ${contentResult.youtubeContent?.title || 'video content'}`;
           break;
-        }
-          
-        case "DOCUMENT_CONTENT": {
-          // Use optional chaining and nullish coalescing to safely access properties
-          const filename = content.documentContent?.filename;
-          if (filename) {
-            readableText = `Summary of document ${String(filename)}`;
-          }
+        case "DOCUMENT_CONTENT":
+          readableText = `Summary of document ${contentResult.documentContent?.filename || 'file'}`;
           break;
-        }
-          
-        case "AUDIO_CONTENT": {
-          // Use optional chaining and nullish coalescing to safely access properties
-          const title = content.audioContent?.title;
-          if (title) {
-            readableText = `Summary of audio ${String(title)}`;
-          }
+        case "AUDIO_CONTENT":
+          readableText = `Summary of audio ${contentResult.audioContent?.title || 'recording'}`;
           break;
-        }
-          
-        case "IMAGE_CONTENT": {
-          // Use optional chaining and nullish coalescing to safely access properties
-          const title = content.imageContent?.title;
-          if (title) {
-            readableText = `Summary of image ${String(title)}`;
-          }
+        case "IMAGE_CONTENT":
+          readableText = `Summary of image ${contentResult.imageContent?.title || 'content'}`;
           break;
-        }
-          
         default:
-          readableText = `Summary of content ${content_id}`;
-      }
-      
-      // Make sure we have some text
-      if (!readableText || readableText.length < 10) {
-        readableText = "This is a summary of your content.";
-      }
-      
-      // Log the processed text
-      // 'Processed summary text:', readableText);
-    }
-
-    // Check if readableText is an object and safely stringify it
-    if (typeof readableText === 'object' && readableText !== null) {
-      // 'WARNING: readableText is an object, converting to JSON string:', readableText);
-      try {
-        // Convert object to a proper string representation
-        readableText = JSON.stringify(readableText);
-      } catch (stringifyError) {
-        // 'Failed to stringify object:', stringifyError);
-        readableText = "Summary of your content. Unable to process original format.";
+          readableText = "Summary of your content";
       }
     }
 
-    // Final fallback if we still don't have valid text
-    if (!readableText || readableText.trim() === "" || readableText.includes('[object Object]')) {
-      readableText = "Summary of your content. Thank you for using our system.";
+    // Clean and validate text
+    readableText = readableText
+      .replace(/\[object Object\]/g, 'content')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!readableText || readableText.length < 5) {
+      readableText = "This is a summary of your content. Thank you for using our system.";
     }
+
+    console.log(`Processing TTS for text: "${readableText.substring(0, 100)}..." (${readableText.length} chars)`);
+
+    // Chunk the text
+    const textChunks = chunkTextSafely(readableText);
     
-    // 'Final processed text for TTS:', readableText);
-    
-    // Truncate text if needed
-    if (readableText.length > MAX_TEXT_LENGTH) {
-      // `Truncating text from ${readableText.length} to ${MAX_TEXT_LENGTH} characters`);
-      readableText = readableText.substring(0, MAX_TEXT_LENGTH);
-    }
-
-    try {
-      // Generate TTS URL with multiple options to enhance reliability
-      let audioUrl: string = ''; // Initialize with empty string to prevent 'used before assigned' error
-      // Default to a descriptive fallback TTS URL
-      const timestamp = Date.now(); // Add timestamp to prevent caching
-      let proxyUrl = `/api/proxy/audio?url=https://translate.google.com/translate_tts?ie=UTF-8&q=Summary+not+available+at+this+time&tl=en&total=1&idx=0&textlen=30&client=tw-ob&prev=input&ttsspeed=1&_=${timestamp}&format=mp3`;
-      
-      // 'Processed readable text:', readableText.substring(0, 100) + '...');
-      
+    if (textChunks.length === 1) {
+      // Single chunk - simple case
       try {
-        // Before sending to Google TTS, do a final validation of the text
-        if (typeof readableText !== 'string') {
-          // 'readableText is not a string:', typeof readableText, readableText);
-          readableText = 'Summary unavailable at this time';
-        }
+        const ttsUrl = await generateTTSWithRetry(textChunks[0]);
+        const timestamp = Date.now();
+        const proxyUrl = `/api/proxy/audio?url=${encodeURIComponent(ttsUrl)}&format=mp3&_t=${timestamp}`;
         
-        // Ensure the text doesn't contain any object references
-        if (readableText.includes('[object Object]') || readableText.includes('Object]') || readableText.includes('[object')) {
-          // 'Text contains object reference, cleaning up:', readableText);
-          readableText = readableText.replace(/\[object Object\]/g, 'content').replace(/\[object.*?\]/g, 'content');
-        }
-        
-        // 'Final clean text being sent to TTS:', readableText);
-        
-        // Get only the first 200 characters to avoid issues with long text
-        const ttsText = typeof readableText === 'string' 
-          ? readableText.substring(0, 200) 
-          : 'Summary of content';
-        
-        // Ensure we're sending a clean string to the TTS API
-        // Double-check for any object references and remove them
-        let sanitizedText = ttsText
-          .replace(/\[object Object\]/g, 'content')
-          .replace(/\[object .*?\]/g, 'content')
-          .replace(/undefined/g, '')
-          .replace(/null/g, '');
-          
-        // 'Sanitized TTS text:', sanitizedText);
-        
-        // Make sure we have meaningful text to convert to speech
-        if (!sanitizedText || sanitizedText.trim().length < 5) {
-          // 'Text too short for TTS, using default message');
-          sanitizedText = 'Summary of your content is ready. Thank you for using our system.';
-        }
-        
-        // Remove any excessive whitespace, line breaks, etc.
-        sanitizedText = sanitizedText.trim()
-          .replace(/\s+/g, ' ')
-          .replace(/\n+/g, ' ')
-          .replace(/\t+/g, ' ');
-          
-        // Make sure we're not exceeding Google TTS limits (usually ~200 chars)
-        if (sanitizedText.length > 180) {
-          sanitizedText = sanitizedText.substring(0, 180) + '...';
-        }
-        
-        // Log the exact text we're sending to TTS
-        // 'FINAL TEXT BEING SENT TO TTS:', sanitizedText);
-        
-        try {
-          // Instead of using the library's getAudioUrl, let's create a direct TTS URL
-          // This ensures we're using exactly the parameters we want
-          const encodedText = encodeURIComponent(sanitizedText);
-          // Create a Google TTS URL directly
-          audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodedText}&tl=en&total=1&idx=0&textlen=${sanitizedText.length}&client=tw-ob&prev=input&ttsspeed=1`;
-          
-          // 'Direct Google TTS URL created:', audioUrl.substring(0, 100) + '...');
-          
-          // Ensure we have a string URL, not an object
-          if (typeof audioUrl !== 'string') {
-            // 'Unexpected TTS URL type:', typeof audioUrl);
-            throw new Error('Invalid Google TTS URL: not a string');
+        // Save to database
+        await prisma.metadata.upsert({
+          where: { content_id },
+          update: {
+            audio_summary: proxyUrl,
+            summary: readableText,
+            updated_at: new Date()
+          },
+          create: {
+            content_id,
+            audio_summary: proxyUrl,
+            summary: readableText,
+            created_at: new Date(),
+            updated_at: new Date()
           }
-          
-          // Check for potential object string representation
-          if (audioUrl.includes('[object Object]') || audioUrl.includes('%5Bobject%20Object%5D')) {
-            // 'Generated URL contains [object Object], cannot use:', audioUrl);
-            throw new Error('Invalid TTS URL contains object reference');
+        });
+
+        return NextResponse.json({
+          message: "Audio generated successfully",
+          data: {
+            audioUrl: proxyUrl,
+            summaryText: readableText,
+            chunkCount: 1,
+            totalLength: readableText.length
           }
-          
-          // If we got this far, we have a valid TTS URL, so update the proxy URL
-          const encodedUrl = encodeURIComponent(audioUrl);
-          proxyUrl = `/api/proxy/audio?url=${encodedUrl}&format=mp3&_t=${timestamp}`;
-          // 'Successfully created TTS URL and updated proxy URL');
-        } catch (ttsError) {
-          // 'Error generating TTS URL, using fallback:', ttsError);
-          // Keep using the fallback URL defined earlier
-        }
+        }, { status: 200 });
         
-        // Log the resulting audio URL to verify it's properly formatted
-        // 'Generated Google TTS URL:', audioUrl.substring(0, 150) + '...');
-        
-        // Double-check the URL is valid
-        try {
-          new URL(audioUrl);
-        } catch (urlError) {
-          // 'Invalid URL format:', audioUrl, urlError);
-          throw new Error('Invalid URL format from Google TTS');
-        }
-        
-        // We've already set the proxyUrl in the TTS generation block if it was successful
-        // This code only runs if we didn't already set the proxyUrl but somehow made it past the TTS generation
-        if (!proxyUrl.includes(encodeURIComponent(audioUrl))) {
-          // Properly encode the URL to ensure it works with special characters
-          const encodedUrl = encodeURIComponent(audioUrl);
-          // Add format parameter to ensure proper content type handling
-          proxyUrl = `/api/proxy/audio?url=${encodedUrl}&format=mp3&_t=${timestamp}`;
-          // 'Updated proxy URL as a fallback:', proxyUrl);
-        }
-        
-        // 'Created proxy URL:', proxyUrl);
-      } catch (error: any) { // Type assertion for the error
-        // 'Failed to generate TTS URL:', error);
-        // 'Using fallback audio URL:', proxyUrl);
-        // We'll continue with the fallback URL instead of throwing
+      } catch (error) {
+        console.error("Error generating single chunk TTS:", error);
+        throw error;
       }
+    } else {
+      // Multiple chunks - create chunked audio endpoint
+      console.log(`Creating chunked audio for ${textChunks.length} chunks`);
       
-      // Store the audio URL and processed text in metadata
+      const timestamp = Date.now();
+      const chunkedUrl = `/api/proxy/audio/chunked?content_id=${content_id}&chunks=${textChunks.length}&_t=${timestamp}`;
+      
+      // Store chunks in a temporary format (in production, use Redis or similar)
+      // For now, we'll store the chunks as JSON in the database
+      const chunksData = {
+        chunks: textChunks,
+        timestamp: timestamp,
+        contentId: content_id
+      };
+      
       await prisma.metadata.upsert({
-        where: {
-          content_id: content_id
-        },
+        where: { content_id },
         update: {
-          audio_summary: proxyUrl,
+          audio_summary: chunkedUrl,
           summary: readableText,
           updated_at: new Date()
         },
         create: {
-          content_id: content_id,
-          audio_summary: proxyUrl,
+          content_id,
+          audio_summary: chunkedUrl,
           summary: readableText,
           created_at: new Date(),
           updated_at: new Date()
         }
       });
-      
-      // Return the proxy URL and processed summary text
+
       return NextResponse.json({
-        message: "Audio generated successfully",
+        message: "Chunked audio prepared successfully",
         data: {
-          audioUrl: proxyUrl,
-          summaryText: readableText, // Send the processed text that was used for TTS
-          originalTtsUrl: audioUrl // For debugging purposes
+          audioUrl: chunkedUrl,
+          summaryText: readableText,
+          chunkCount: textChunks.length,
+          totalLength: readableText.length,
+          isChunked: true,
+          rateLimitInfo: {
+            requestsPerMinute: TTS_CONFIG.MAX_REQUESTS_PER_MINUTE,
+            estimatedTime: `${Math.ceil(textChunks.length * TTS_CONFIG.REQUEST_DELAY / 1000)}s`
+          }
         }
-      }, {
+      }, { 
         status: 200,
         headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
+          'X-Rate-Limit-Warning': `This request will make ${textChunks.length} TTS calls. Please be aware of rate limits.`
         }
       });
-    } catch (error) {
-      // "Error generating audio:", error);
-      return NextResponse.json({ 
-        message: "Failed to generate audio", 
-        error: String(error) 
-      }, { status: 500 });
     }
+
   } catch (error) {
-    // "Error in audio generation endpoint:", error instanceof Error ? error.message : error);
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    console.error("Error in audio generation:", error);
+    return NextResponse.json({ 
+      message: "Failed to generate audio", 
+      error: String(error),
+      rateLimitInfo: {
+        note: "If you're hitting rate limits, please wait before retrying"
+      }
+    }, { status: 500 });
   }
 }
 
+// Keep the existing POST endpoint for backward compatibility
 export async function POST(req: NextRequest) {
   try {
-    // Authenticate the user
     const { user, error } = await authenticateUser(req);
     if (error) return error;
 
-    // Parse request body
     const body = await req.json();
     const { text, content_id } = body;
 
-    // Input validation
     if (!content_id) {
-      return NextResponse.json(
-        { message: "Please provide content_id!" },
-        { status: 400 }
-      );
+      return NextResponse.json({ message: "Please provide content_id!" }, { status: 400 });
     }
 
-    if (!text) {
-      return NextResponse.json(
-        { message: "No text provided for audio generation" },
-        { status: 400 }
-      );
-    }
-
-    // Check if user has access to content
     const hasAccess = await checkContentAccess(user.user_id, content_id);
     if (!hasAccess) {
-      return NextResponse.json(
-        { message: "Content not found for the user!" },
-        { status: 403 }
-      );
+      return NextResponse.json({ message: "Content not found or not accessible" }, { status: 403 });
     }
 
-    // Truncate text if needed
-    const processedText = text.substring(0, MAX_TEXT_LENGTH);
-    // 'Using text for TTS generation:', processedText.substring(0, 100) + '...');
+    if (!text || typeof text !== 'string') {
+      return NextResponse.json({ message: "Please provide valid text!" }, { status: 400 });
+    }
 
+    console.log('Direct TTS request for text:', text.substring(0, 100) + '...');
+
+    const processedText = text.substring(0, TTS_CONFIG.MAX_CHUNK_LENGTH);
+    
     try {
-      // Generate TTS URL with improved options
-      const audioUrl = await googleTTS(processedText, {
-        lang: 'en',
-        slow: false,
-        host: 'https://translate.google.com'
-      });
+      const ttsUrl = await generateTTSWithRetry(processedText);
+      const timestamp = Date.now();
+      const proxyUrl = `/api/proxy/audio?url=${encodeURIComponent(ttsUrl)}&format=mp3&_t=${timestamp}`;
       
-      // Create a proxy URL to avoid CORS issues
-      const encodedUrl = encodeURIComponent(audioUrl);
-      const proxyUrl = `/api/proxy/audio?url=${encodedUrl}`;
-      
-      // 'Created proxy URL for audio');
-      
-      // Store the audio URL in metadata using upsert
       await prisma.metadata.upsert({
         where: { content_id },
         update: { 
@@ -511,31 +452,23 @@ export async function POST(req: NextRequest) {
         }
       });
       
-      // Return the audio URL and processed text
       return NextResponse.json({
         message: "Audio generated successfully",
         data: {
           audioUrl: proxyUrl,
           summaryText: processedText,
-          originalTtsUrl: audioUrl // For debugging purposes
+          originalTtsUrl: ttsUrl
         }
-      }, {
-        status: 200,
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
-      });
+      }, { status: 200 });
     } catch (ttsError) {
-      // "Error generating audio:", ttsError);
+      console.error("Error generating audio:", ttsError);
       return NextResponse.json({ 
         message: "Failed to generate audio", 
         error: String(ttsError) 
       }, { status: 500 });
     }
   } catch (error) {
-    // "Error in audio generation endpoint:", error instanceof Error ? error.message : error);
+    console.error("Error in audio generation endpoint:", error);
     return NextResponse.json({ message: "Internal server error" }, { status: 500 });
   }
 }

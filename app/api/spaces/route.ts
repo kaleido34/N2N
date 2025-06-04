@@ -44,13 +44,22 @@ export async function GET(req: NextRequest) {
         id: spaceContent.content.content_id,
         type: spaceContent.content.content_type,
         createdAt: spaceContent.content.created_at,
-        // If it's a YouTube content:
-        title: spaceContent.content.youtubeContent?.title || null,
-        thumbnailUrl:
-          spaceContent.content.youtubeContent?.thumbnail_url || null,
-        // If it's a Document content:
-        filename: spaceContent.content.documentContent?.filename || null,
-        fileUrl: spaceContent.content.documentContent?.file_url || null,
+        // Get title from the appropriate content type
+        title: spaceContent.content.youtubeContent?.title || 
+               spaceContent.content.imageContent?.title ||
+               spaceContent.content.audioContent?.title ||
+               spaceContent.content.documentContent?.filename ||
+               null,
+        thumbnailUrl: spaceContent.content.youtubeContent?.thumbnail_url || null,
+        // Include filename and fileUrl for all content types
+        filename: spaceContent.content.documentContent?.filename || 
+                 spaceContent.content.imageContent?.image_url ||
+                 spaceContent.content.audioContent?.file_url ||
+                 null,
+        fileUrl: spaceContent.content.documentContent?.file_url ||
+                spaceContent.content.imageContent?.image_url ||
+                spaceContent.content.audioContent?.file_url ||
+                null,
         youtube_id: spaceContent.content.youtubeContent?.youtube_id || null,
       })),
     }));

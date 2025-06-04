@@ -10,12 +10,16 @@ import { shouldAllowApiCall, markApiCallCompleted } from "@/lib/api-limiter";
 export interface ContentItem {
   id: string;
   youtube_id?: string;
-  type?: string;
+  type: string;
   createdAt?: string;
-  title?: string | null;
+  title: string | null;
   thumbnailUrl?: string | null;
   filename?: string | null;
   fileUrl?: string | null;
+  // Add other possible fields from different content types
+  description?: string | null;
+  image_url?: string | null;
+  text?: string | null;
 }
 
 export interface SpaceItem {
@@ -193,7 +197,20 @@ export const useSpacesStore = create(
             }
             
             console.log('[DEBUG] got spaces from API:', data.spaces.length);
-            set({ spaces: data.spaces, loading: false });
+            
+            // Transform the spaces data to ensure consistent structure
+            const transformedSpaces = data.spaces.map((space: any) => ({
+              ...space,
+              contents: space.contents?.map((content: any) => ({
+                ...content,
+                // Ensure title is set from either title or filename
+                title: content.title || content.filename || 'Untitled',
+                // Ensure type is in the correct format
+                type: content.type || 'UNKNOWN'
+              })) || []
+            }));
+            
+            set({ spaces: transformedSpaces, loading: false });
             
             // Update the last successful call time
             lastSuccessfulCallTime = Date.now();

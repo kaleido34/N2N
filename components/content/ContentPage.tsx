@@ -121,10 +121,46 @@ export default function ContentPage({ id }: ContentPageProps) {
               if (typeof summaryData === 'string') {
                 try {
                   console.log('Summary data is a string, attempting to parse:', summaryData.substring(0, 50) + '...');
-                  summaryData = JSON.parse(summaryData);
+                  
+                  // First, check if it looks like JSON (starts with { or [)
+                  const trimmed = summaryData.trim();
+                  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                    summaryData = JSON.parse(summaryData);
+                  } else {
+                    // It's plain text, wrap it in a proper structure
+                    console.log('Summary data appears to be plain text, wrapping in structure');
+                    summaryData = {
+                      sections: [
+                        {
+                          type: 'heading',
+                          level: 2,
+                          content: 'Summary'
+                        },
+                        {
+                          type: 'paragraph',
+                          content: summaryData
+                        }
+                      ]
+                    };
+                  }
                 } catch (parseError) {
                   console.error('Failed to parse summary data string as JSON:', parseError);
-                  throw new Error('Invalid summary data format - failed to parse string');
+                  console.log('Converting plain text to structured format');
+                  
+                  // If JSON parsing fails, treat as plain text and structure it
+                  summaryData = {
+                    sections: [
+                      {
+                        type: 'heading',
+                        level: 2,
+                        content: 'Summary'
+                      },
+                      {
+                        type: 'paragraph',
+                        content: summaryData
+                      }
+                    ]
+                  };
                 }
               }
               
@@ -133,12 +169,54 @@ export default function ContentPage({ id }: ContentPageProps) {
                 // Use the sections array from the object
                 console.log('Found sections array in summaryData object');
                 summaryData = summaryData.sections;
+              } else if (Array.isArray(summaryData)) {
+                // It's already an array, use it directly
+                console.log('Summary data is already an array');
+              } else if (summaryData && typeof summaryData === 'object') {
+                // It's an object but not in expected format, try to extract content
+                console.log('Summary data is an object, trying to extract meaningful content');
+                const content = summaryData.content || summaryData.summary || JSON.stringify(summaryData);
+                summaryData = [
+                  {
+                    type: 'heading',
+                    level: 2,
+                    content: 'Summary'
+                  },
+                  {
+                    type: 'paragraph',
+                    content: String(content)
+                  }
+                ];
+              } else {
+                // Fallback for any other format
+                console.log('Summary data in unexpected format, creating fallback');
+                summaryData = [
+                  {
+                    type: 'heading',
+                    level: 2,
+                    content: 'Summary'
+                  },
+                  {
+                    type: 'paragraph',
+                    content: 'Summary data could not be properly formatted.'
+                  }
+                ];
               }
               
               // Final validation that we have an array
               if (!Array.isArray(summaryData)) {
                 console.error('Expected array of sections but got:', typeof summaryData, summaryData);
-                throw new Error('Invalid summary data format - not an array');
+                summaryData = [
+                  {
+                    type: 'heading',
+                    level: 2,
+                    content: 'Summary'
+                  },
+                  {
+                    type: 'paragraph',
+                    content: 'Summary format could not be processed.'
+                  }
+                ];
               }
               
               console.log('Valid summary sections array received, length:', summaryData.length);
@@ -147,7 +225,7 @@ export default function ContentPage({ id }: ContentPageProps) {
               const validSections = summaryData.map((section: any) => {
                 // Basic validation to ensure objects have required properties
                 if (!section || typeof section !== 'object') {
-                  return { type: 'paragraph' as const, content: 'Invalid section data' };
+                  return { type: 'paragraph' as const, content: String(section || 'Invalid section data') };
                 }
                 
                 // Ensure type is one of the allowed values
@@ -159,7 +237,7 @@ export default function ContentPage({ id }: ContentPageProps) {
                 // Ensure content is a string
                 const content = typeof section.content === 'string' 
                   ? section.content 
-                  : String(section.content || '');
+                  : String(section.content || section.text || section.title || '');
                   
                 return {
                   type,
@@ -191,7 +269,60 @@ export default function ContentPage({ id }: ContentPageProps) {
             } catch (parseError) {
               console.error('Error processing summary data:', parseError);
               
-              // Create a simple fallback
+              // If we can't process the existing summary, try to regenerate it
+              console.log('Attempting to regenerate summary due to parsing error');
+              try {
+                // Try to fetch a fresh summary by forcing regeneration
+                const regenerateResponse = await axios.get<SummaryResponse>(
+                  `/api/spaces/generate/summary?content_id=${contentId}&force=true`,
+                  {
+                    headers: { 
+                      Authorization: `Bearer ${user.token}`,
+                      'Cache-Control': 'no-cache',
+                      'Pragma': 'no-cache'
+                    }
+                  }
+                );
+                
+                if (regenerateResponse.data?.data) {
+                  console.log('Successfully regenerated summary:', regenerateResponse.data.data);
+                  // Process the regenerated summary using the same logic above
+                  let regeneratedSummary = regenerateResponse.data.data;
+                  
+                  if (typeof regeneratedSummary === 'string') {
+                    const trimmed = regeneratedSummary.trim();
+                    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                      regeneratedSummary = JSON.parse(regeneratedSummary);
+                    }
+                  }
+                  
+                  if (regeneratedSummary?.sections && Array.isArray(regeneratedSummary.sections)) {
+                    regeneratedSummary = regeneratedSummary.sections;
+                  } else if (!Array.isArray(regeneratedSummary)) {
+                    regeneratedSummary = [
+                      { type: 'heading', level: 2, content: 'Summary' },
+                      { type: 'paragraph', content: String(regeneratedSummary) }
+                    ];
+                  }
+                  
+                  const validRegeneratedSections = regeneratedSummary.map((section: any) => ({
+                    type: section.type || 'paragraph',
+                    level: section.level,
+                    content: String(section.content || section.text || section.title || '')
+                  }));
+                  
+                  setContent(prev => {
+                    if (!prev) return null;
+                    return { ...prev, summary: validRegeneratedSections };
+                  });
+                  
+                  return; // Exit successfully after regeneration
+                }
+              } catch (regenerateError) {
+                console.error('Failed to regenerate summary:', regenerateError);
+              }
+              
+              // Create a simple fallback if regeneration also fails
               const fallbackSummary: SummaryData = {
                 sections: [
                   { 
@@ -201,7 +332,7 @@ export default function ContentPage({ id }: ContentPageProps) {
                   },
                   {
                     type: 'paragraph',
-                    content: 'We were unable to generate a summary for this content. Please try again later.'
+                    content: 'We were unable to load or generate a summary for this content. The data may be in an old format. Please try refreshing the page.'
                   }
                 ]
               };
@@ -256,24 +387,55 @@ export default function ContentPage({ id }: ContentPageProps) {
             // Convert string array to structured format
             processedSummary = data.summary.map((item: string) => ({ 
               type: 'paragraph' as const, 
-              content: item 
+              content: String(item)
             }));
           }
         } else if (typeof data.summary === 'string') {
           // Try to parse if it's a JSON string
           try {
-            const parsed = JSON.parse(data.summary);
-            if (parsed.sections) {
-              processedSummary = parsed.sections;
+            const trimmed = data.summary.trim();
+            if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+              // Looks like JSON, try to parse
+              const parsed = JSON.parse(data.summary);
+              if (parsed.sections && Array.isArray(parsed.sections)) {
+                processedSummary = parsed.sections;
+              } else if (Array.isArray(parsed)) {
+                processedSummary = parsed.map((item: any) => {
+                  if (typeof item === 'object' && item.type && item.content) {
+                    return item;
+                  }
+                  return { type: 'paragraph', content: String(item) };
+                });
+              } else {
+                // Single object, wrap in paragraph
+                processedSummary = [{ type: 'paragraph', content: String(parsed) }];
+              }
             } else {
-              processedSummary = [{ type: 'paragraph', content: data.summary }];
+              // Plain text, wrap it properly
+              processedSummary = [
+                { type: 'heading', level: 2, content: 'Summary' },
+                { type: 'paragraph', content: data.summary }
+              ];
             }
           } catch {
-            processedSummary = [{ type: 'paragraph', content: data.summary }];
+            // Not JSON, treat as plain text
+            processedSummary = [
+              { type: 'heading', level: 2, content: 'Summary' },
+              { type: 'paragraph', content: data.summary }
+            ];
           }
-        } else if (typeof data.summary === 'object') {
+        } else if (typeof data.summary === 'object' && data.summary !== null) {
           // It might already be in the correct format
-          processedSummary = data.summary.sections || [];
+          if (data.summary.sections && Array.isArray(data.summary.sections)) {
+            processedSummary = data.summary.sections;
+          } else {
+            // Object but not in expected format
+            const content = data.summary.content || data.summary.summary || JSON.stringify(data.summary);
+            processedSummary = [
+              { type: 'heading', level: 2, content: 'Summary' },
+              { type: 'paragraph', content: String(content) }
+            ];
+          }
         }
       }
       

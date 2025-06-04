@@ -293,28 +293,23 @@ export async function GET(req: Request) {
   }
 
   try {
-    // Try to find basic content information first
+    // Try to find basic content information first with all related content
     const content = await prisma.content.findUnique({
       where: { content_id: id },
-      include: { metadata: true }
+      include: { 
+        metadata: true,
+        youtubeContent: true,
+        documentContent: true,
+        audioContent: true,
+        imageContent: true
+      }
     });
 
     if (!content) {
       return NextResponse.json({ error: "Content not found" }, { status: 404 });
     }
 
-    // Try to find as YouTube content
-    const youtubeContent = await prisma.youtubeContent.findUnique({
-      where: { content_id: id }
-    });
-
-    // Try to find as Document content
-    const documentContent = await prisma.documentContent.findUnique({
-      where: { content_id: id },
-      include: { content: { include: { metadata: true } } }
-    });
-
-    // Prepare summary array based on content type
+    // Prepare summary array based on content type with consistent parsing
     let summaryText = [];
     let title = 'Untitled Content';
     
@@ -322,18 +317,39 @@ export async function GET(req: Request) {
     if (content.metadata?.summary) {
       try {
         // Try to parse as JSON first
-        summaryText = JSON.parse(content.metadata.summary);
+        const parsedSummary = JSON.parse(content.metadata.summary);
+        
+        // Handle different summary formats consistently
+        if (parsedSummary.sections && Array.isArray(parsedSummary.sections)) {
+          // New structured format with sections
+          summaryText = parsedSummary.sections;
+        } else if (Array.isArray(parsedSummary)) {
+          // Array format - convert to structured format
+          summaryText = parsedSummary.map(item => ({
+            type: 'paragraph',
+            content: typeof item === 'string' ? item : String(item)
+          }));
+        } else {
+          // Single item - wrap in array
+          summaryText = [{
+            type: 'paragraph',
+            content: String(parsedSummary)
+          }];
+        }
       } catch (e) {
         // If not JSON, treat as a single paragraph
-        summaryText = [content.metadata.summary];
+        summaryText = [{
+          type: 'paragraph',
+          content: content.metadata.summary
+        }];
       }
     }
     
     // Set title based on content type
-    if (youtubeContent) {
-      title = youtubeContent.title;
-    } else if (documentContent) {
-      title = documentContent.filename;
+    if (content.youtubeContent) {
+      title = content.youtubeContent.title;
+    } else if (content.documentContent) {
+      title = content.documentContent.filename;
     } else if (content.audioContent) {
       title = content.audioContent.title || 'Audio Content';
     } else if (content.imageContent) {
@@ -355,26 +371,49 @@ export async function GET(req: Request) {
     };
 
     // Add YouTube-specific data if it exists
-    if (youtubeContent) {
+    if (content.youtubeContent) {
       return NextResponse.json({
         ...response,
-        youtube_url: youtubeContent.youtube_url,
-        youtube_id: youtubeContent.youtube_id,
-        transcript: youtubeContent.transcript,
+        youtube_url: content.youtubeContent.youtube_url,
+        youtube_id: content.youtubeContent.youtube_id,
+        transcript: content.youtubeContent.transcript,
         type: "YOUTUBE_CONTENT"
       });
     }
 
     // Add Document-specific data if it exists
-    if (documentContent) {
+    if (content.documentContent) {
       return NextResponse.json({
         ...response,
-        filename: documentContent.filename,
-        file_url: documentContent.file_url,
-        doc_id: documentContent.doc_id,
-        hash: documentContent.hash,
-        text: documentContent.text,
+        filename: content.documentContent.filename,
+        file_url: content.documentContent.file_url,
+        doc_id: content.documentContent.doc_id,
+        hash: content.documentContent.hash,
+        text: content.documentContent.text,
         type: "DOCUMENT_CONTENT"
+      });
+    }
+
+    // Add Audio-specific data if it exists
+    if (content.audioContent) {
+      return NextResponse.json({
+        ...response,
+        audio_id: content.audioContent.audio_id,
+        audio_url: content.audioContent.audio_url,
+        duration: content.audioContent.duration,
+        transcript: content.audioContent.transcript,
+        type: "AUDIO_CONTENT"
+      });
+    }
+
+    // Add Image-specific data if it exists
+    if (content.imageContent) {
+      return NextResponse.json({
+        ...response,
+        image_id: content.imageContent.image_id,
+        image_url: content.imageContent.image_url,
+        text: content.imageContent.text,
+        type: "IMAGE_CONTENT"
       });
     }
 
