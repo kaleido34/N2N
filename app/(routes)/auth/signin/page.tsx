@@ -30,6 +30,8 @@ interface DecodedToken {
 export default function SignIn() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const { user, login } = useAuth();
   const [formData, setFormData] = useState({
     username: "",
@@ -44,6 +46,9 @@ export default function SignIn() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
+    setError('');
+    
     try {
       const response = await axios.post("/api/users/signin", {
         username: formData.username,
@@ -75,8 +80,19 @@ export default function SignIn() {
         }
         router.push("/dashboard");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error during sign-in:", error);
+      if (error.response?.status === 401) {
+        setError('Invalid email or password. Please try again.');
+      } else if (error.response?.status === 404) {
+        setError('No account found with this email. Please sign up first.');
+      } else if (error.response?.status >= 500) {
+        setError('Server error. Please try again later.');
+      } else {
+        setError('Something went wrong. Please try again.');
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -102,6 +118,11 @@ export default function SignIn() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                <p className="text-red-700 dark:text-red-300 text-sm text-center">{error}</p>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="username" className="text-[#232323] dark:text-[#C7AFFF]">Email</Label>
               <div className="relative">
@@ -145,8 +166,8 @@ export default function SignIn() {
                 </Button>
               </div>
             </div>
-            <Button type="submit" className="w-full h-12 rounded-md bg-[#7B5EA7] hover:bg-[#684b9e] text-white font-bold text-lg shadow transition-all duration-200">
-              Sign In
+            <Button type="submit" className="w-full h-12 rounded-md bg-[#7B5EA7] hover:bg-[#684b9e] text-white font-bold text-lg shadow transition-all duration-200" disabled={loading}>
+              {loading ? "Signing In..." : "Sign In"}
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </form>

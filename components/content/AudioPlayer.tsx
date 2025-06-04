@@ -361,9 +361,10 @@ export function AudioPlayer({ isVisible, onClose, contentTitle, audioData, audio
           
           // If this is chunked audio and there are more chunks, play the next one
           if (chunkedData && currentChunk < chunkedData.totalChunks - 1) {
-            console.log(`Moving to next chunk: ${currentChunk + 1}/${chunkedData.totalChunks}`);
+            console.log(`Auto-advancing to next chunk: ${currentChunk + 1}/${chunkedData.totalChunks}`);
             setCurrentChunk(prev => prev + 1);
-            // Keep playing state active for smooth transition
+            // Maintain playing state for auto-continuation
+            setIsPlaying(true);
             return;
           }
           
@@ -380,16 +381,18 @@ export function AudioPlayer({ isVisible, onClose, contentTitle, audioData, audio
           setIsLoading(false);
           setLoadingProgress(100);
           
-          // If we're transitioning between chunks and were playing, auto-start the new chunk
-          if (chunkedData && isPlaying && currentChunk > 0) {
-            console.log(`Auto-starting chunk ${currentChunk + 1} since playback was active`);
-            // Ensure the button state stays as "playing" during transition
-            setIsPlaying(true);
-            audio.play().catch(error => {
-              console.error('Failed to auto-play next chunk:', error);
-              setAudioError('Failed to continue playback. Please try again.');
-              setIsPlaying(false);
-            });
+          // Auto-start next chunk if we're in the middle of playing chunked audio
+          if (chunkedData && isPlaying) {
+            console.log(`Auto-starting chunk ${currentChunk + 1} to maintain playback continuity`);
+            setTimeout(() => {
+              if (audioRef.current && audioRef.current === audio) {
+                audio.play().catch(error => {
+                  console.error('Failed to auto-play next chunk:', error);
+                  setAudioError('Failed to continue playback. Please try again.');
+                  setIsPlaying(false);
+                });
+              }
+            }, 100); // Small delay to ensure audio is fully ready
           }
         };
         
@@ -410,7 +413,10 @@ export function AudioPlayer({ isVisible, onClose, contentTitle, audioData, audio
         
         const onPause = () => {
           console.log('Audio paused');
-          setIsPlaying(false);
+          // Only set playing state to false if it's not an automatic chunk transition
+          if (!chunkedData || currentChunk === chunkedData.totalChunks - 1) {
+            setIsPlaying(false);
+          }
           if (animationRef.current) {
             cancelAnimationFrame(animationRef.current);
             animationRef.current = undefined;

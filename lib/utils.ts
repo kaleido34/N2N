@@ -593,3 +593,119 @@ GUIDELINES:
     throw new Error('Failed to generate mind map. Please try again.');
   }
 };
+
+// Concept Match interfaces and function
+interface ConceptMatchPair {
+  id: string;
+  concept: string;
+  definition: string;
+}
+
+interface ConceptMatchResponse {
+  conceptMatch: ConceptMatchPair[];
+}
+
+export const generateConceptMatch = async (transcripts: string): Promise<ConceptMatchResponse> => {
+  // Import the parseAiResponse helper
+  const { parseAiResponse } = await import('./ai-utils');
+  
+  const prompt = `Create concept-definition matching pairs from educational content. Return valid JSON only.
+
+REQUIRED JSON STRUCTURE:
+{
+  "conceptMatch": [
+    {
+      "id": "1",
+      "concept": "Brief concept or term",
+      "definition": "Clear, concise definition"
+    }
+  ]
+}
+
+GUIDELINES:
+- Generate 6-8 concept-definition pairs covering key topics
+- Use clear, concise concepts (1-4 words)
+- Provide accurate, very concise definitions (5-12 words maximum)
+- Cover the most important terms and concepts
+- Include both technical terms and general concepts
+- Ensure definitions are very brief but self-contained and clear
+- Mix easy, medium, and challenging concepts
+- Avoid overly complex or obscure terms
+- Ensure valid JSON that can be parsed with JSON.parse()
+- Each concept should have a unique, clear definition`;
+
+  try {
+    const generateContent = await model.generateContent([prompt, transcripts]);
+    const responseText = generateContent.response.text();
+    
+    // Parse the response using our helper function
+    const conceptMatchData = parseAiResponse<ConceptMatchResponse>(responseText);
+    return conceptMatchData;
+  } catch (error) {
+    console.error('Error generating concept match:', error);
+    throw new Error('Failed to generate concept match. Please try again.');
+  }
+};
+
+// Term Builder interfaces and function
+interface TermBuilderChain {
+  id: string;
+  title: string;
+  description: string;
+  correctChain: string[];
+  availableTerms: string[];
+  difficulty: 'easy' | 'medium' | 'hard';
+}
+
+interface TermBuilderResponse {
+  termBuilder: TermBuilderChain[];
+}
+
+export const generateTermBuilder = async (transcripts: string): Promise<TermBuilderResponse> => {
+  // Import the parseAiResponse helper
+  const { parseAiResponse } = await import('./ai-utils');
+  
+  const prompt = `Create term building chains from educational content. Return valid JSON only.
+
+REQUIRED JSON STRUCTURE:
+{
+  "termBuilder": [
+    {
+      "id": "1",
+      "title": "Chain Title",
+      "description": "Brief description (15 words max)",
+      "correctChain": ["Term1", "Term2", "Term3", "Term4"],
+      "availableTerms": ["Term1", "Term2", "Term3", "Term4", "Distractor1", "Distractor2"],
+      "difficulty": "easy"
+    }
+  ]
+}
+
+GUIDELINES:
+- Generate exactly 3 chains with increasing difficulty (easy, medium, hard)
+- Each correct chain should have 4-6 terms in logical sequence
+- Include 6-8 available terms (correct terms + 2-4 distractors)
+- Distractors should be plausible but incorrect for the sequence
+- Chain should show clear logical progression: process steps, cause-effect, chronological order, or hierarchy
+- Use clear, concise terms (1-2 words each, 3 words maximum)
+- Provide brief descriptions (10-15 words maximum)
+- Ensure chains follow understandable logic: temporal sequence, process flow, or conceptual hierarchy
+- Cover different aspects of the content with distinct logical patterns
+- Easy: obvious chronological or step-by-step sequence
+- Medium: requires understanding of relationships or dependencies
+- Hard: complex conceptual or hierarchical relationships
+- Make sequences that users can reason through logically
+- Ensure valid JSON that can be parsed with JSON.parse()`;
+
+  try {
+    const generateContent = await model.generateContent([prompt, transcripts]);
+    const responseText = generateContent.response.text();
+    
+    // Parse the response using our helper function
+    const termBuilderData = parseAiResponse<TermBuilderResponse>(responseText);
+    return termBuilderData;
+  } catch (error) {
+    console.error('Error generating term builder:', error);
+    throw new Error('Failed to generate term builder. Please try again.');
+  }
+};

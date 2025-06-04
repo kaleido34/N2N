@@ -55,8 +55,8 @@ export async function POST(req: NextRequest) {
         const transcript: transcriptInterface[] | null = await fetchTranscripts(video_id);
         if (!transcript || transcript.length === 0) {
             return NextResponse.json(
-                { message: "Error while processing youtube video!"},
-                { status: 401}
+                { message: "No transcripts available for this video. Please try a different video with captions enabled."},
+                { status: 400}
             )
         }
 

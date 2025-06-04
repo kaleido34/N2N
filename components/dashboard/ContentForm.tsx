@@ -179,6 +179,11 @@ export function ContentForm() {
       throw new Error(responseData.message || responseData.error || "Failed to create content");
     }
     
+    // Check for transcript-related errors even with 200 status
+    if (responseData.error === "NO_TRANSCRIPT" || responseData.error === "TRANSCRIPT_ERROR") {
+      throw new Error(responseData.message || "No transcripts available for this video. Please try a different video with captions enabled.");
+    }
+    
     // Handle successful URL submission
     await handleUploadSuccess(responseData);
   };

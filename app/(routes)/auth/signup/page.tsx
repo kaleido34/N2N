@@ -23,6 +23,7 @@ import { ThemeToggleButton } from "@/components/mode-toggle";
 export default function SignUp() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     username: "",
     firstName: "",
@@ -41,6 +42,8 @@ export default function SignUp() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
+    
     try {
       await axios.post("/api/users/signup", {
         username: formData.username,
@@ -49,8 +52,17 @@ export default function SignUp() {
         password: formData.password,
       });
       router.push("/auth/signin");
-    } catch (error) {
-      // handle error (optional: show error message)
+    } catch (error: any) {
+      console.error("Error during sign-up:", error);
+      if (error.response?.status === 409) {
+        setError('An account with this email already exists. Please use a different email or sign in.');
+      } else if (error.response?.status === 400) {
+        setError('Please check your information and try again.');
+      } else if (error.response?.status >= 500) {
+        setError('Server error. Please try again later.');
+      } else {
+        setError('Something went wrong. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -78,6 +90,11 @@ export default function SignUp() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                <p className="text-red-700 dark:text-red-300 text-sm text-center">{error}</p>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="email" className="text-[#232323] dark:text-[#C7AFFF]">Email</Label>
               <div className="relative">

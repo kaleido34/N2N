@@ -28,7 +28,8 @@ import { useRouter } from "next/navigation";
 import { QuizDialog } from "./QuizDialog";
 import { FlashcardsDialog } from "./FlashcardsDialog";
 import { MindmapDialog } from "./MindmapDialog";
-import { GamesDialog } from "./ConceptMatchDialog";
+import { ConceptMatchDialog } from "./ConceptMatchDialog";
+import { TermBuilderDialog } from "./TermBuilderDialog";
 import { AudioPlayer } from "./AudioPlayer";
 import { TranscriptsDialog } from "./TranscriptsDialog";
 
@@ -135,8 +136,17 @@ export default function RightSidebar({
             youtubeId={youtubeId}
           />
 
-          {/* Play Games */}
-          <GamesDialog />
+          {/* Concept Match */}
+          <ConceptMatchDialog 
+            contentId={contentId}
+            youtubeId={youtubeId}
+          />
+
+          {/* Concept Builder */}
+          <TermBuilderDialog 
+            contentId={contentId}
+            youtubeId={youtubeId}
+          />
 
           {/* Listen Audio */}
           <button 

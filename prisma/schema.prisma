@@ -111,6 +111,8 @@ model Metadata {
   flashcards     Json?
   mindmap        Json?
   quiz           Json?
+  concept_match  Json?    // Concept match data
+  term_builder   Json?    // Term builder data
   created_at     DateTime @default(now())
   updated_at     DateTime @updatedAt
   content        Content  @relation(fields: [content_id], references: [content_id], onDelete: Cascade)
