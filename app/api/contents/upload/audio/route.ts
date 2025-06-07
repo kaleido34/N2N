@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { v4 as uuid } from "uuid";
 import { generateQuiz, generateFlashCards, generateMindMap, summarizeChunks, transcriptInterface } from "@/lib/utils";
+import { parseAiResponse } from "@/lib/ai-utils";
 
 export const config = {
   api: {
@@ -106,16 +107,34 @@ export async function POST(req: NextRequest) {
       generateFlashCards(text),
       generateMindMap(text),
       summarizeChunks(text).then(summary => {
-        // Ensure the summary is properly stringified before saving
+        // Properly parse AI response which may contain markdown code blocks
         if (summary) {
           try {
-            // If it's already a string, parse it to ensure it's valid JSON
-            const parsed = typeof summary === 'string' ? JSON.parse(summary) : summary;
-            // Then re-stringify it to ensure consistent format
-            return JSON.stringify(parsed);
+            // Use the AI response parser to handle markdown formatting (```json ... ```)
+            const parsed = parseAiResponse(summary);
+            if (parsed) {
+              // Return the parsed object directly, don't stringify it here
+              // The database storage logic will handle stringification
+              return parsed;
+            }
           } catch (e) {
-            console.error('Error processing summary:', e);
-            return null;
+            console.error('Error processing summary with parseAiResponse:', e);
+            // Fallback: try to clean manually and parse
+            try {
+              const cleaned = summary.replace(/```json\n?|```/g, '').trim();
+              const fallbackParsed = JSON.parse(cleaned);
+              // Return the parsed object directly
+              return fallbackParsed;
+            } catch (fallbackError) {
+              console.error('Fallback parsing also failed:', fallbackError);
+              // Create a basic structure for plain text
+              return {
+                sections: [
+                  { type: 'heading', level: 2, content: 'Summary' },
+                  { type: 'paragraph', content: summary }
+                ]
+              };
+            }
           }
         }
         return null;
@@ -153,7 +172,7 @@ export async function POST(req: NextRequest) {
     },
     metadata: {
       create: {
-        summary: summary ? (typeof summary === 'string' ? summary : JSON.stringify(summary)) : null,
+        summary: summary ? JSON.stringify(summary) : null,
         flashcards: flashcards ? (typeof flashcards === 'string' ? JSON.parse(flashcards) : flashcards) : null,
         mindmap: mindmap ? (typeof mindmap === 'string' ? JSON.parse(mindmap) : mindmap) : null,
         quiz: quiz ? (typeof quiz === 'string' ? JSON.parse(quiz) : quiz) : null,

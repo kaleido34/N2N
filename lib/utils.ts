@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { YoutubeTranscript } from "youtube-transcript";
+import { Innertube } from 'youtubei.js/web';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
@@ -43,23 +43,30 @@ export async function fetchTranscripts(
     video_id: string
 ): Promise<transcriptInterface[] | null> {
     try {
-        const transcript = await YoutubeTranscript.fetchTranscript(video_id, {
-            lang: "en",
+        // Create an Innertube instance to access YouTube's internal API
+        const youtube = await Innertube.create({
+            lang: 'en',
+            location: 'US',
+            retrieve_player: false,
         });
 
-        if (!transcript || transcript.length === 0) {
+        // Fetch video info and transcript using the video ID
+        const info = await youtube.getInfo(video_id);
+        const transcriptData = await info.getTranscript();
+
+        if (!transcriptData || !transcriptData.transcript?.content?.body?.initial_segments) {
             console.error("No transcript data returned for video:", video_id);
             return null;
         }
 
-        const formattedTranscript: transcriptInterface[] = transcript.map(
-            (item) => ({
-                text: item.text,
-                duration: item.duration,
-                offset: item.offset,
-                lang: item.lang || "en",
-            })
-        );
+        // Map the transcript segments to our interface format
+        const segments = transcriptData.transcript.content.body.initial_segments;
+        const formattedTranscript: transcriptInterface[] = segments.map((segment: any) => ({
+            text: segment.snippet.text,
+            duration: segment.end_ms - segment.start_ms,
+            offset: segment.start_ms / 1000, // Convert from milliseconds to seconds
+            lang: "en",
+        }));
 
         return formattedTranscript;
     } catch (transcriptError: unknown) {
@@ -261,7 +268,7 @@ Return exactly this JSON structure:
 }
 
 GUIDELINES:
-- Total length: ~500 words
+- Total length: ~600 words 
 - Introduction (~100 words): Main subject, purpose, context
 - 2-3 Topic Sections (~300 words total): Cover core concepts, use content-specific headings
 - Key Insights (~100 words): Important takeaways and applications
@@ -525,14 +532,14 @@ REQUIRED JSON STRUCTURE:
     {
       "key": 2,
       "text": "Main Branch 1",
-      "category": "main",
+      "category": "section",
       "level": 2,
       "parent": 1
     },
     {
       "key": 3,
       "text": "Subtopic A",
-      "category": "sub",
+      "category": "topic",
       "level": 3,
       "parent": 2
     }
@@ -552,7 +559,7 @@ GUIDELINES:
 - Ensure logical parent-child relationships
 - Cover all major topics in the content
 - Balance branches evenly
-- Use "category" values: "root" (central), "main" (level 2), "sub" (level 3)
+- Use "category" values: "root" (central), "section" (level 2), "topic" (level 3)
 - Include relationship types: "contains", "includes", "leads_to", or "relates_to"
 - Ensure valid JSON that can be parsed with JSON.parse()`;
 
@@ -594,7 +601,7 @@ GUIDELINES:
           node.key = newKey;
           if (node.category === 'root' || originalKey === 1) { // This was the root of the sub-chunk
             currentChunkRootOriginalKey = originalKey; // Store its *original* key from chunkData
-            node.category = 'main'; // Re-categorize as a main branch
+            node.category = 'section'; // Re-categorize as a section branch
           }
         }
       });

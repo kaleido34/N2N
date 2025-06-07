@@ -5,10 +5,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import axios from 'axios';
+import { useAuth } from "@/hooks/auth-provider";
 
 interface QuizDialogProps {
-  quizData: any;
-  quizLoading: boolean;
   contentId?: string;
   youtubeId?: string;
 }
@@ -52,13 +52,17 @@ const sampleQuestions = [
   // Add more questions as needed
 ];
 
-export function QuizDialog({ quizData, quizLoading, contentId, youtubeId }: QuizDialogProps) {
+export function QuizDialog({ contentId, youtubeId }: QuizDialogProps) {
+  const { user } = useAuth();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answerState, setAnswerState] = useState<AnswerState>('unanswered');
   const [score, setScore] = useState(0);
   const [quizCompleted, setQuizCompleted] = useState(false);
   const [answeredQuestions, setAnsweredQuestions] = useState<Set<number>>(new Set());
   const [open, setOpen] = useState(false);
+  const [quizData, setQuizData] = useState<any>(null);
+  const [quizLoading, setQuizLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Debug what format we're receiving
   console.log("Quiz data format received:", quizData);
@@ -128,6 +132,70 @@ export function QuizDialog({ quizData, quizLoading, contentId, youtubeId }: Quiz
     questions = sampleQuestions;
   }
   
+  // Fetch quiz data function
+  const fetchQuiz = async () => {
+    if (!contentId || !user?.token) return;
+
+    setQuizLoading(true);
+    setError(null);
+
+    try {
+      const response = await axios.get(
+        `/api/spaces/generate/quiz?content_id=${contentId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${user?.token}`
+          }
+        }
+      );
+      
+      if (response && response.data) {
+        console.log('Quiz API response:', response.data);
+        // Handle different response formats
+        let quizContent;
+        
+        if (typeof response.data === 'object' && response.data !== null) {
+          // Normal API response format with data property
+          if ('data' in response.data && response.data.data) {
+            quizContent = response.data.data;
+            console.log('Quiz data from response.data.data:', quizContent);
+          } 
+          // Direct quiz object format
+          else if ('quiz' in response.data) {
+            quizContent = response.data.quiz;
+            console.log('Quiz data from response.data.quiz:', quizContent);
+          }
+          // Fallback quiz format
+          else if ('questions' in response.data) {
+            quizContent = { quiz: response.data.questions };
+            console.log('Quiz data from response.data.questions:', quizContent);
+          } else {
+            // Try to use the response.data directly
+            quizContent = response.data;
+            console.log('Using response.data directly as quiz content:', quizContent);
+          }
+          
+          if (quizContent) {
+            console.log('Setting quiz data:', quizContent);
+            setQuizData(quizContent);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching quiz data:", error);
+      setError('Failed to load quiz data');
+    } finally {
+      setQuizLoading(false);
+    }
+  };
+
+  // Lazy loading when dialog opens
+  useEffect(() => {
+    if (open && !quizData && !quizLoading) {
+      fetchQuiz();
+    }
+  }, [open, quizData, quizLoading]);
+
   // Store user answers for each question separately
   const [userAnswers, setUserAnswers] = useState<(number | null)[]>(() => new Array(questions.length).fill(null));
 
@@ -207,25 +275,35 @@ export function QuizDialog({ quizData, quizLoading, contentId, youtubeId }: Quiz
         </button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[650px] p-0 overflow-hidden bg-[#FAF7F8] dark:bg-gray-900">
+        <div className="flex items-center gap-3 p-3 border-b">
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-white">
+              <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path>
+            </svg>
+          </div>
+          <DialogTitle className="text-xl font-semibold text-[#5B4B8A]">Take a Quiz</DialogTitle>
+        </div>
+
         {quizLoading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#5B4B8A]"></div>
+          <div className="flex items-center justify-center py-8">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#5B4B8A] mx-auto"></div>
+              <p className="mt-2 text-gray-600 dark:text-gray-300">Generating quiz...</p>
+            </div>
+          </div>
+        ) : error ? (
+          <div className="text-center py-8">
+            <p className="text-red-500 mb-4">{error}</p>
+            <Button onClick={fetchQuiz} variant="outline">
+              Try Again
+            </Button>
           </div>
         ) : !questions || questions.length === 0 ? (
-          <div className="flex items-center justify-center h-64">
-            <p>No quiz questions available.</p>
+          <div className="flex items-center justify-center py-8">
+            <p className="text-gray-600 dark:text-gray-300">No quiz questions available.</p>
           </div>
         ) : (
-          <div className="flex flex-col">
-            <div className="flex items-center gap-3 p-3 border-b">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-white">
-                  <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path>
-                </svg>
-              </div>
-              <DialogTitle className="text-xl font-semibold text-[#5B4B8A]">Take a Quiz</DialogTitle>
-            </div>
-            
+          <div className="flex flex-col">            
             {!quizCompleted ? (
               <div className="px-6 py-4">
                 <h3 className="text-lg font-medium mb-4 text-[#5B4B8A]">Question {currentQuestionIndex + 1} of {totalQuestions}</h3>

@@ -310,18 +310,16 @@ export async function GET(req: NextRequest) {
         const timestamp = Date.now();
         const proxyUrl = `/api/proxy/audio?url=${encodeURIComponent(ttsUrl)}&format=mp3&_t=${timestamp}`;
         
-        // Save to database
+        // Save to database - only update audio_summary, NOT the summary field
         await prisma.metadata.upsert({
           where: { content_id },
           update: {
             audio_summary: proxyUrl,
-            summary: readableText,
             updated_at: new Date()
           },
           create: {
             content_id,
             audio_summary: proxyUrl,
-            summary: readableText,
             created_at: new Date(),
             updated_at: new Date()
           }
@@ -360,13 +358,11 @@ export async function GET(req: NextRequest) {
         where: { content_id },
         update: {
           audio_summary: chunkedUrl,
-          summary: readableText,
           updated_at: new Date()
         },
         create: {
           content_id,
           audio_summary: chunkedUrl,
-          summary: readableText,
           created_at: new Date(),
           updated_at: new Date()
         }

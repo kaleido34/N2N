@@ -41,10 +41,6 @@ interface RightSidebarProps {
   youtubeId?: string;
   mindmapData: any;
   mindmapLoading: boolean;
-  quizData: any;
-  quizLoading: boolean;
-  flashcardsData: any;
-  flashcardsLoading: boolean;
   audioData: any;
   audioLoading: boolean;
   transcriptData: any;
@@ -56,10 +52,6 @@ export default function RightSidebar({
   youtubeId,
   mindmapData,
   mindmapLoading,
-  quizData,
-  quizLoading,
-  flashcardsData,
-  flashcardsLoading,
   audioData,
   audioLoading,
   transcriptData,
@@ -114,16 +106,12 @@ export default function RightSidebar({
         <div className="space-y-1 px-2">
           {/* Take a Quiz */}
           <QuizDialog 
-            quizData={quizData}
-            quizLoading={quizLoading}
             contentId={contentId}
             youtubeId={youtubeId}
           />
 
           {/* View Flashcards */}
           <FlashcardsDialog 
-            flashcardsData={flashcardsData}
-            flashcardsLoading={flashcardsLoading}
             contentId={contentId}
             youtubeId={youtubeId}
           />

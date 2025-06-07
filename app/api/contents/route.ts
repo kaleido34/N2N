@@ -6,6 +6,99 @@ import { authenticateUser } from "@/lib/auth-helpers";
 
 // Import only what you need - remove embedding-related imports
 import { fetchTranscripts, preprocessTranscript, transcriptInterface } from "@/lib/utils";
+
+// Summary processing function to ensure consistent format across all content types
+const processSummaryData = (rawSummary: any): any[] => {
+  if (!rawSummary) {
+    return [];
+  }
+
+  // If it's already an array of sections, validate and return
+  if (Array.isArray(rawSummary)) {
+    return rawSummary.map((item: any) => {
+      if (typeof item === 'object' && item !== null && item.type && item.content) {
+        return {
+          type: item.type || 'paragraph',
+          level: item.level,
+          content: String(item.content || '')
+        };
+      }
+      // If it's a string in the array
+      return { type: 'paragraph' as const, content: String(item) };
+    });
+  }
+
+  // If it's a string, try to parse it
+  if (typeof rawSummary === 'string') {
+    const trimmed = rawSummary.trim();
+    
+    // Try JSON parsing first
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        
+        // Check if parsed has sections property
+        if (parsed && typeof parsed === 'object' && parsed.sections && Array.isArray(parsed.sections)) {
+          return parsed.sections.map((section: any) => ({
+            type: section.type || 'paragraph',
+            level: section.level,
+            content: String(section.content || section.text || '')
+          }));
+        }
+        
+        // If it's an array directly
+        if (Array.isArray(parsed)) {
+          return parsed.map((item: any) => ({
+            type: item.type || 'paragraph',
+            level: item.level,
+            content: String(item.content || item.text || item)
+          }));
+        }
+
+        // If it's a single object
+        return [{ 
+          type: 'paragraph' as const, 
+          content: String(parsed.content || parsed.text || parsed.summary || JSON.stringify(parsed))
+        }];
+        
+      } catch (parseError) {
+        console.warn('Failed to parse summary JSON, treating as plain text:', parseError);
+      }
+    }
+    
+    // Not JSON or JSON parse failed, treat as plain text
+    return [
+      { type: 'heading' as const, level: 2, content: 'Summary' },
+      { type: 'paragraph' as const, content: trimmed }
+    ];
+  }
+
+  // If it's an object (but not array)
+  if (typeof rawSummary === 'object' && rawSummary !== null) {
+    // Check if it has sections property
+    if (rawSummary.sections && Array.isArray(rawSummary.sections)) {
+      return rawSummary.sections.map((section: any) => ({
+        type: section.type || 'paragraph',
+        level: section.level,
+        content: String(section.content || section.text || '')
+      }));
+    }
+    
+    // Single object, extract content
+    const content = rawSummary.content || rawSummary.summary || rawSummary.text || JSON.stringify(rawSummary);
+    return [
+      { type: 'heading' as const, level: 2, content: 'Summary' },
+      { type: 'paragraph' as const, content: String(content) }
+    ];
+  }
+
+  // Fallback for any other type
+  return [
+    { type: 'heading' as const, level: 2, content: 'Summary' },
+    { type: 'paragraph' as const, content: String(rawSummary) }
+  ];
+};
+
 // --------------------------------------
 // Helper function to extract YouTube ID
 // --------------------------------------
@@ -313,36 +406,9 @@ export async function GET(req: Request) {
     let summaryText = [];
     let title = 'Untitled Content';
     
-    // Get summary from unified metadata if available
+    // Get summary from unified metadata if available using consistent processing
     if (content.metadata?.summary) {
-      try {
-        // Try to parse as JSON first
-        const parsedSummary = JSON.parse(content.metadata.summary);
-        
-        // Handle different summary formats consistently
-        if (parsedSummary.sections && Array.isArray(parsedSummary.sections)) {
-          // New structured format with sections
-          summaryText = parsedSummary.sections;
-        } else if (Array.isArray(parsedSummary)) {
-          // Array format - convert to structured format
-          summaryText = parsedSummary.map(item => ({
-            type: 'paragraph',
-            content: typeof item === 'string' ? item : String(item)
-          }));
-        } else {
-          // Single item - wrap in array
-          summaryText = [{
-            type: 'paragraph',
-            content: String(parsedSummary)
-          }];
-        }
-      } catch (e) {
-        // If not JSON, treat as a single paragraph
-        summaryText = [{
-          type: 'paragraph',
-          content: content.metadata.summary
-        }];
-      }
+      summaryText = processSummaryData(content.metadata.summary);
     }
     
     // Set title based on content type

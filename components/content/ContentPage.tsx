@@ -44,18 +44,108 @@ export default function ContentPage({ id }: ContentPageProps) {
   
   // Data states
   const [mindmapData, setMindmapData] = useState<any>(null);
-  const [quizData, setQuizData] = useState<any>(null);
-  const [flashcardsData, setFlashcardsData] = useState<any>(null);
   const [audioData, setAudioData] = useState<any>(null);
   const [transcriptData, setTranscriptData] = useState<any>(null);
   
   // Loading states
   const [mindmapLoading, setMindmapLoading] = useState<boolean>(false);
-  const [quizLoading, setQuizLoading] = useState<boolean>(false);
-  const [flashcardsLoading, setFlashcardsLoading] = useState<boolean>(false);
   const [audioLoading, setAudioLoading] = useState<boolean>(false);
   const [transcriptLoading, setTranscriptLoading] = useState<boolean>(false);
   const [summaryLoading, setSummaryLoading] = useState<boolean>(false);
+
+  // Centralized summary processing function
+  const processSummaryData = (rawSummary: any): SummarySection[] => {
+    console.log('Processing summary data:', { rawSummary, type: typeof rawSummary });
+    
+    if (!rawSummary) {
+      return [];
+    }
+
+    // If it's already an array of sections, validate and return
+    if (Array.isArray(rawSummary)) {
+      return rawSummary.map((item: any) => {
+        if (typeof item === 'object' && item !== null && item.type && item.content) {
+          return {
+            type: item.type || 'paragraph',
+            level: item.level,
+            content: String(item.content || '')
+          };
+        }
+        // If it's a string in the array
+        return { type: 'paragraph' as const, content: String(item) };
+      });
+    }
+
+    // If it's a string, try to parse it
+    if (typeof rawSummary === 'string') {
+      const trimmed = rawSummary.trim();
+      
+      // Try JSON parsing first
+      if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          
+          // Check if parsed has sections property
+          if (parsed && typeof parsed === 'object' && parsed.sections && Array.isArray(parsed.sections)) {
+            return parsed.sections.map((section: any) => ({
+              type: section.type || 'paragraph',
+              level: section.level,
+              content: String(section.content || section.text || '')
+            }));
+          }
+          
+          // If it's an array directly
+          if (Array.isArray(parsed)) {
+            return parsed.map((item: any) => ({
+              type: item.type || 'paragraph',
+              level: item.level,
+              content: String(item.content || item.text || item)
+            }));
+          }
+
+          // If it's a single object
+          return [{ 
+            type: 'paragraph' as const, 
+            content: String(parsed.content || parsed.text || parsed.summary || JSON.stringify(parsed))
+          }];
+          
+        } catch (parseError) {
+          console.warn('Failed to parse summary JSON, treating as plain text:', parseError);
+        }
+      }
+      
+      // Not JSON or JSON parse failed, treat as plain text
+      return [
+        { type: 'heading' as const, level: 2, content: 'Summary' },
+        { type: 'paragraph' as const, content: trimmed }
+      ];
+    }
+
+    // If it's an object (but not array)
+    if (typeof rawSummary === 'object' && rawSummary !== null) {
+      // Check if it has sections property
+      if (rawSummary.sections && Array.isArray(rawSummary.sections)) {
+        return rawSummary.sections.map((section: any) => ({
+          type: section.type || 'paragraph',
+          level: section.level,
+          content: String(section.content || section.text || '')
+        }));
+      }
+      
+      // Single object, extract content
+      const content = rawSummary.content || rawSummary.summary || rawSummary.text || JSON.stringify(rawSummary);
+      return [
+        { type: 'heading' as const, level: 2, content: 'Summary' },
+        { type: 'paragraph' as const, content: String(content) }
+      ];
+    }
+
+    // Fallback for any other type
+    return [
+      { type: 'heading' as const, level: 2, content: 'Summary' },
+      { type: 'paragraph' as const, content: String(rawSummary) }
+    ];
+  };
 
   // Add function to fetch summary
   const fetchSummary = async (contentId: string, forceRegenerate: boolean = false) => {
@@ -221,48 +311,25 @@ export default function ContentPage({ id }: ContentPageProps) {
               
               console.log('Valid summary sections array received, length:', summaryData.length);
               
-              // Use the sections array directly - API should already validate format
-              const validSections = summaryData.map((section: any) => {
-                // Basic validation to ensure objects have required properties
-                if (!section || typeof section !== 'object') {
-                  return { type: 'paragraph' as const, content: String(section || 'Invalid section data') };
-                }
-                
-                // Ensure type is one of the allowed values
-                const validTypes = ['heading', 'paragraph', 'list_item'];
-                const type = validTypes.includes(section.type) 
-                  ? section.type as SummarySection['type']
-                  : 'paragraph' as const;
-                
-                // Ensure content is a string
-                const content = typeof section.content === 'string' 
-                  ? section.content 
-                  : String(section.content || section.text || section.title || '');
-                  
-                return {
-                  type,
-                  level: section.level,
-                  content
-                };
-              });
+              // Process summary data using centralized function
+              const processedSections = processSummaryData(summaryData);
               
-              console.log('Processed summary sections:', validSections.length);
+              console.log('Processed summary sections:', processedSections.length);
               
               // Save to state
-              // Important: Set the validated array of sections directly to content.summary
               setContent(prev => {
                 if (!prev) return null;
-                console.log('Setting summary in content state:', validSections);
+                console.log('Setting summary in content state:', processedSections);
                 return {
                   ...prev,
-                  summary: validSections
+                  summary: processedSections
                 };
               });
               
               // Cache the successful response
               if (typeof window !== 'undefined') {
                 localStorage.setItem(`n2n-content-${contentId}-summary`, JSON.stringify({
-                  data: validSections,  // Store the processed array directly
+                  data: processedSections,  // Store the processed array directly
                   timestamp: new Date().getTime()
                 }));
               }
@@ -305,15 +372,11 @@ export default function ContentPage({ id }: ContentPageProps) {
                     ];
                   }
                   
-                  const validRegeneratedSections = regeneratedSummary.map((section: any) => ({
-                    type: section.type || 'paragraph',
-                    level: section.level,
-                    content: String(section.content || section.text || section.title || '')
-                  }));
+                  const processedRegeneratedSections = processSummaryData(regeneratedSummary);
                   
                   setContent(prev => {
                     if (!prev) return null;
-                    return { ...prev, summary: validRegeneratedSections };
+                    return { ...prev, summary: processedRegeneratedSections };
                   });
                   
                   return; // Exit successfully after regeneration
@@ -374,70 +437,8 @@ export default function ContentPage({ id }: ContentPageProps) {
       
       const data = await res.json();
       
-      // Update content first
-      // Check if data.summary is in the new format or needs conversion
-      let processedSummary = [];
-      
-      if (data.summary) {
-        if (Array.isArray(data.summary)) {
-          // Check if each item has a type property (new format)
-          if (data.summary.length > 0 && typeof data.summary[0] === 'object' && data.summary[0] !== null && 'type' in data.summary[0]) {
-            processedSummary = data.summary;
-          } else {
-            // Convert string array to structured format
-            processedSummary = data.summary.map((item: string) => ({ 
-              type: 'paragraph' as const, 
-              content: String(item)
-            }));
-          }
-        } else if (typeof data.summary === 'string') {
-          // Try to parse if it's a JSON string
-          try {
-            const trimmed = data.summary.trim();
-            if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-              // Looks like JSON, try to parse
-              const parsed = JSON.parse(data.summary);
-              if (parsed.sections && Array.isArray(parsed.sections)) {
-                processedSummary = parsed.sections;
-              } else if (Array.isArray(parsed)) {
-                processedSummary = parsed.map((item: any) => {
-                  if (typeof item === 'object' && item.type && item.content) {
-                    return item;
-                  }
-                  return { type: 'paragraph', content: String(item) };
-                });
-              } else {
-                // Single object, wrap in paragraph
-                processedSummary = [{ type: 'paragraph', content: String(parsed) }];
-              }
-            } else {
-              // Plain text, wrap it properly
-              processedSummary = [
-                { type: 'heading', level: 2, content: 'Summary' },
-                { type: 'paragraph', content: data.summary }
-              ];
-            }
-          } catch {
-            // Not JSON, treat as plain text
-            processedSummary = [
-              { type: 'heading', level: 2, content: 'Summary' },
-              { type: 'paragraph', content: data.summary }
-            ];
-          }
-        } else if (typeof data.summary === 'object' && data.summary !== null) {
-          // It might already be in the correct format
-          if (data.summary.sections && Array.isArray(data.summary.sections)) {
-            processedSummary = data.summary.sections;
-          } else {
-            // Object but not in expected format
-            const content = data.summary.content || data.summary.summary || JSON.stringify(data.summary);
-            processedSummary = [
-              { type: 'heading', level: 2, content: 'Summary' },
-              { type: 'paragraph', content: String(content) }
-            ];
-          }
-        }
-      }
+      // Process summary data using centralized function
+      const processedSummary = processSummaryData(data.summary);
       
       setContent({
         ...data,
@@ -551,9 +552,15 @@ export default function ContentPage({ id }: ContentPageProps) {
             };
             
             // First priority: Fetch summary and transcript - crucial for reading
-            // Always fetch the summary - removing the conditional check that was preventing it
-            console.log('Fetching summary regardless of existing data');
-            await fetchWithCache('summary', fetchSummary, data.id, false);
+            // For audio content, skip summary fetch if we already have good data to prevent overwrites
+            if (data.type === "AUDIO_CONTENT" && data.summary && Array.isArray(data.summary) && data.summary.length > 0) {
+              console.log('Skipping summary fetch for audio content - already have valid summary data with', data.summary.length, 'sections');
+            } else if (!data.summary || !Array.isArray(data.summary) || data.summary.length === 0) {
+              console.log('Fetching summary because no valid summary data found');
+              await fetchWithCache('summary', fetchSummary, data.id, false);
+            } else {
+              console.log('Skipping summary fetch - already have valid summary data with', data.summary.length, 'sections');
+            }
             
             // Debug what summary data looks like after fetch
             console.log('After fetch summary check:', {
@@ -575,10 +582,7 @@ export default function ContentPage({ id }: ContentPageProps) {
             // Lower priority: Fetch supplementary learning materials in parallel
             await Promise.allSettled([
               !mindmapData ? fetchWithCache('mindmap', fetchMindmap, data.youtube_id || '', data.id) : Promise.resolve(),
-              // Force a fresh fetch for flashcards data to resolve sample data issues
-              fetchWithCache('flashcards', fetchFlashcards, data.youtube_id || '', data.id, true),
-              // Force a fresh fetch for quiz data to resolve sample data issues
-              fetchWithCache('quiz', fetchQuiz, data.youtube_id || '', data.id, true)
+              // Note: Quiz and Flashcards are now loaded lazily when their dialogs are opened
             ]);
           } catch (error) {
             console.error('Error loading content data:', error);
@@ -622,135 +626,7 @@ export default function ContentPage({ id }: ContentPageProps) {
     }
   };
   
-  // Fetch quiz data
-  const fetchQuiz = async (youtube_id: string, content_id: string) => {
-    if (!content_id || !user?.token) return;
-    try {
-      setQuizLoading(true);
-      const response = await axios.get(
-        `/api/spaces/generate/quiz?content_id=${content_id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${user?.token}`
-          }
-        }
-      );
-      
-      if (response && response.data) {
-        console.log('Quiz API response:', response.data);
-        // Handle different response formats
-        let quizContent;
-        
-        if (typeof response.data === 'object' && response.data !== null) {
-          // Normal API response format with data property
-          if ('data' in response.data && response.data.data) {
-            quizContent = response.data.data;
-            console.log('Quiz data from response.data.data:', quizContent);
-          } 
-          // Direct quiz object format
-          else if ('quiz' in response.data) {
-            quizContent = response.data.quiz;
-            console.log('Quiz data from response.data.quiz:', quizContent);
-          }
-          // Fallback quiz format
-          else if ('questions' in response.data) {
-            quizContent = { quiz: response.data.questions };
-            console.log('Quiz data from response.data.questions:', quizContent);
-          } else {
-            // Try to use the response.data directly
-            quizContent = response.data;
-            console.log('Using response.data directly as quiz content:', quizContent);
-          }
-          
-          if (quizContent) {
-            console.log('Setting quiz data:', quizContent);
-            setQuizData(quizContent);
-            // Cache the successful response
-            localStorage.setItem(`n2n-content-${content_id}-quiz`, JSON.stringify({
-              data: quizContent,
-              timestamp: new Date().getTime()
-            }));
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching quiz data:", error);
-      
-      // Check if we have a cached version
-      try {
-        if (typeof window !== 'undefined') {
-          const cached = localStorage.getItem(`n2n-content-${content_id}-quiz`);
-          if (cached) {
-            const { data: cachedData } = JSON.parse(cached);
-            if (cachedData) {
-              setQuizData(cachedData);
-              console.log('Using cached quiz data');
-            }
-          }
-        }
-      } catch (cacheError) {
-        console.warn('Error retrieving cached quiz:', cacheError);
-      }
-    } finally {
-      setQuizLoading(false);
-    }
-  };
-  
-  // Fetch flashcards data
-  const fetchFlashcards = async (youtube_id: string, content_id: string) => {
-    if (!content_id || !user?.token) return;
-    try {
-      setFlashcardsLoading(true);
-      const response = await axios.get(
-        `/api/spaces/generate/flashcards?content_id=${content_id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${user?.token}`
-          }
-        }
-      );
-      if (response && response.data) {
-        console.log('Flashcards API response:', response.data);
-        let flashcardsContent;
-        
-        if (typeof response.data === 'object' && response.data !== null) {
-          // Normal API response format with data property
-          if ('data' in response.data && response.data.data) {
-            flashcardsContent = response.data.data;
-            console.log('Flashcards from response.data.data:', flashcardsContent);
-          } 
-          // Direct flashcards array format
-          else if (Array.isArray(response.data)) {
-            flashcardsContent = { flashcards: response.data };
-            console.log('Flashcards from array response:', flashcardsContent);
-          }
-          // Direct flashcards object format
-          else if ('flashcards' in response.data) {
-            flashcardsContent = response.data;
-            console.log('Flashcards from response.data.flashcards:', flashcardsContent);
-          } else {
-            // Try to use the response.data directly
-            flashcardsContent = response.data;
-            console.log('Using response.data directly as flashcards:', flashcardsContent);
-          }
-          
-          if (flashcardsContent) {
-            console.log('Setting flashcards data:', flashcardsContent);
-            setFlashcardsData(flashcardsContent);
-            // Cache the successful response
-            localStorage.setItem(`n2n-content-${content_id}-flashcards`, JSON.stringify({
-              data: flashcardsContent,
-              timestamp: new Date().getTime()
-            }));
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching flashcards data:", error);
-    } finally {
-      setFlashcardsLoading(false);
-    }
-  };
+
   
   // Define audio data interfaces at the component scope for reuse
   interface AudioData {
@@ -925,10 +801,6 @@ export default function ContentPage({ id }: ContentPageProps) {
           youtubeId={content.youtube_id}
           mindmapData={mindmapData}
           mindmapLoading={mindmapLoading}
-          quizData={quizData}
-          quizLoading={quizLoading}
-          flashcardsData={flashcardsData}
-          flashcardsLoading={flashcardsLoading}
           audioData={audioData}
           audioLoading={audioLoading}
           transcriptData={transcriptData}
