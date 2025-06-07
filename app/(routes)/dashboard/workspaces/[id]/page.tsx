@@ -5,6 +5,7 @@ import { Video, FileText, FileAudio, FileImage, File, Headphones } from "lucide-
 import Link from "next/link";
 import { useAuth } from "@/hooks/auth-provider";
 import { useSpaces } from "@/hooks/space-provider";
+import { useClipboard } from "@/hooks/clipboard-provider";
 import Image from "next/image";
 import {
   DropdownMenu,
@@ -12,7 +13,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import { MoreVertical } from "lucide-react";
+import { MoreVertical, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useGlobalLoading } from "@/components/LayoutClient";
@@ -48,6 +49,7 @@ export default function SpacePage() {
   const { spaces, loading, refreshSpaces } = useSpaces();
   const { isAuthenticated, user } = useAuth();
   const { setShow } = useGlobalLoading();
+  const { copyLesson } = useClipboard();
 
   const [localContents, setLocalContents] = React.useState<ContentItem[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -216,6 +218,23 @@ export default function SpacePage() {
 
   // Keep this for any future UI differences, but delete will work everywhere
   const isPersonalWorkspace = workspaceData.name.toLowerCase().includes("personal") && workspaceData.name.toLowerCase().includes("workspace");
+
+  // Function to copy content to clipboard
+  const handleCopyContent = (content: ContentItem) => {
+    const copiedLesson = {
+      id: content.id,
+      type: content.type,
+      title: content.title,
+      thumbnailUrl: content.thumbnailUrl,
+      filename: content.filename,
+      fileUrl: content.fileUrl,
+      youtube_id: content.youtube_id,
+      originalWorkspaceId: spaceId,
+    };
+    
+    copyLesson(copiedLesson);
+    toast.success("Lesson copied to clipboard!");
+  };
 
   // Function to delete content from the workspace
   const handleDeleteContent = async (contentId: string) => {
@@ -389,6 +408,16 @@ export default function SpacePage() {
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    <DropdownMenuItem 
+                      className="cursor-pointer" 
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        handleCopyContent(item);
+                      }}
+                    >
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy
+                    </DropdownMenuItem>
                     <DropdownMenuItem 
                       className="text-red-500 cursor-pointer" 
                       onSelect={(e) => {

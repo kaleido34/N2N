@@ -4,8 +4,9 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/auth-provider";
 import { useSpaces } from "@/hooks/space-provider";
+import { useClipboard } from "@/hooks/clipboard-provider";
 import { CreateSpaceDialog } from "@/components/create-space-dialog";
-import { Briefcase, MoreVertical, PlusCircle, Trash2 } from "lucide-react";
+import { Briefcase, MoreVertical, PlusCircle, Trash2, Clipboard } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { BackButton } from "@/components/ui/back-button";
@@ -23,6 +24,7 @@ import { toast } from "sonner";
 export default function SpacesPage() {
   const { isAuthenticated, user } = useAuth();
   const { spaces, loading, addSpace, refreshSpaces } = useSpaces();
+  const { copiedLessons, hasCopiedLessons, clearClipboard } = useClipboard();
   const router = useRouter();
 
   console.log('[DEBUG] SpacesPage render', { 
@@ -182,6 +184,50 @@ export default function SpacesPage() {
     }
   };
 
+  // Handle pasting lessons to a workspace
+  const handlePasteLessons = async (targetWorkspaceId: string) => {
+    if (!user?.token || !copiedLessons.length) return;
+    
+    try {
+      const lessonIds = copiedLessons.map(lesson => lesson.id);
+      
+      const res = await fetch(`/api/workspaces/${targetWorkspaceId}/copy-lessons`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${user.token}`,
+        },
+        body: JSON.stringify({ lessonIds }),
+      });
+      
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to paste lessons");
+      }
+      
+      const result = await res.json();
+      
+      if (result.copiedCount > 0) {
+        toast.success(`Successfully pasted ${result.copiedCount} lesson(s)!`);
+        if (result.skippedCount > 0) {
+          toast.info(`${result.skippedCount} lesson(s) were already in this workspace`);
+        }
+      } else {
+        toast.info("All lessons were already in this workspace");
+      }
+      
+      // Clear clipboard after successful paste
+      clearClipboard();
+      
+      // Refresh spaces to show updated content
+      await refreshSpaces(user.token, true);
+      
+    } catch (error) {
+      console.error("Error pasting lessons:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to paste lessons");
+    }
+  };
+
   // Handle space deletion
   const handleDeleteSpace = async (spaceId: string) => {
     if (!user?.token) return;
@@ -248,18 +294,30 @@ export default function SpacesPage() {
                   {space.name}
                 </h3>
               </Link>
-              {!(space.name.toLowerCase().includes("personal") && space.name.toLowerCase().includes("workspace")) && (
-                <div className="absolute top-2 right-2 z-10">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button 
-                        className="p-1 rounded-full hover:bg-[#E58C5A]/80 dark:hover:bg-[#E58C5A]/90 focus:outline-none"
-                        onClick={(e) => e.preventDefault()}
+              <div className="absolute top-2 right-2 z-10">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button 
+                      className="p-1 rounded-full hover:bg-[#E58C5A]/80 dark:hover:bg-[#E58C5A]/90 focus:outline-none"
+                      onClick={(e) => e.preventDefault()}
+                    >
+                      <MoreVertical className="h-5 w-5 text-black dark:text-white" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {hasCopiedLessons && (
+                      <DropdownMenuItem 
+                        className="cursor-pointer" 
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          handlePasteLessons(space.id);
+                        }}
                       >
-                        <MoreVertical className="h-5 w-5 text-black dark:text-white" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                        <Clipboard className="h-4 w-4 mr-2" />
+                        Paste ({copiedLessons.length})
+                      </DropdownMenuItem>
+                    )}
+                    {!(space.name.toLowerCase().includes("personal") && space.name.toLowerCase().includes("workspace")) && (
                       <DropdownMenuItem 
                         className="text-red-500 cursor-pointer" 
                         onSelect={(e) => {
@@ -269,10 +327,10 @@ export default function SpacesPage() {
                       >
                         Delete
                       </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              )}
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-200 mt-auto">
               {space.contents?.length || 0} items

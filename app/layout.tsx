@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/hooks/auth-provider";
 import { SpacesProvider } from "@/hooks/space-provider";
+import { ClipboardProvider } from "@/hooks/clipboard-provider";
 import LayoutClient from "@/components/LayoutClient";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -29,7 +30,9 @@ export default function RootLayout({
         >
           <AuthProvider>
             <SpacesProvider>
-              <LayoutClient>{children}</LayoutClient>
+              <ClipboardProvider>
+                <LayoutClient>{children}</LayoutClient>
+              </ClipboardProvider>
             </SpacesProvider>
           </AuthProvider>
         </ThemeProvider>
