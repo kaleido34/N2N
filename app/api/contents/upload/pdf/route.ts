@@ -181,7 +181,7 @@ export async function POST(req: NextRequest) {
           user_id: userId,
         },
       },
-      spaces: {
+                              spaces: {
         create: {
           space_id: finalSpaceId,
         },

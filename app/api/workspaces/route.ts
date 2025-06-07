@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
 
     const userId = user.user_id;
 
-    // 3) Fetch all spaces belonging to this user, including their contents
+    // 3) Fetch all workspaces belonging to this user, including their contents
     const userSpaces = await prisma.space.findMany({
       where: { user_id: userId },
       include: {
@@ -33,10 +33,10 @@ export async function GET(req: NextRequest) {
     });
 
     // Log the request for debugging
-    console.log(`[API] GET /api/spaces request from user ${userId}`);
+    console.log(`[API] GET /api/workspaces request from user ${userId}`);
     
     // 4) Transform the data into a front-end-friendly shape if needed
-    const spaces = userSpaces.map((space: any) => ({
+    const workspaces = userSpaces.map((space: any) => ({
       id: space.space_id,
       name: space.space_name,
       createdAt: space.created_at,
@@ -64,8 +64,8 @@ export async function GET(req: NextRequest) {
       })),
     }));
 
-    // 5) Return the spaces with cache control headers
-    const response = NextResponse.json({ spaces });
+    // 5) Return the workspaces with cache control headers
+    const response = NextResponse.json({ workspaces });
     
     // Add cache control headers to prevent excessive calls
     response.headers.set('Cache-Control', 'private, max-age=10');
@@ -73,7 +73,7 @@ export async function GET(req: NextRequest) {
     
     return response;
   } catch (error) {
-    console.error("Error fetching user spaces:", error);
+    console.error("Error fetching user workspaces:", error);
     return NextResponse.json(
       { message: "Internal server error" },
       { status: 500 }
@@ -95,30 +95,30 @@ export async function POST(req: NextRequest) {
     const { name } = await req.json();
     if (!name || !name.trim()) {
       return NextResponse.json(
-        { message: "Space name is required" },
+        { message: "Workspace name is required" },
         { status: 400 }
       );
     }
 
-    // Create the space in DB
-    const newSpace = await prisma.space.create({
+    // Create the workspace in DB
+    const newWorkspace = await prisma.space.create({
       data: {
         user_id: userId,
         space_name: name.trim(),
       },
     });
 
-    // Return the created space
+    // Return the created workspace
     return NextResponse.json(
       {
-        id: newSpace.space_id,
-        name: newSpace.space_name,
-        createdAt: newSpace.created_at,
+        id: newWorkspace.space_id,
+        name: newWorkspace.space_name,
+        createdAt: newWorkspace.created_at,
       },
       { status: 201 }
     );
   } catch (error) {
-    console.error("Error creating space:", error);
+    console.error("Error creating workspace:", error);
     return NextResponse.json(
       { message: "Internal server error" },
       { status: 500 }

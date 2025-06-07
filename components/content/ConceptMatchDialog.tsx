@@ -59,7 +59,7 @@ export function ConceptMatchDialog({ contentId, youtubeId }: ConceptMatchDialogP
     setError(null);
 
     try {
-      const response = await fetch(`/api/spaces/generate/conceptmatch`, {
+      const response = await fetch(`/api/workspaces/generate/conceptmatch`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

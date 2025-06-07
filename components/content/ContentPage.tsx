@@ -183,7 +183,7 @@ export default function ContentPage({ id }: ContentPageProps) {
         console.log('🔄 Fetching summary from API for content ID:', contentId);
         
         // Create full URL for logging purposes
-        const apiUrl = `/api/spaces/generate/summary?content_id=${contentId}${forceRegenerate ? '&force=true' : ''}`;
+        const apiUrl = `/api/workspaces/generate/summary?content_id=${contentId}${forceRegenerate ? '&force=true' : ''}`;
         console.log('📡 API URL:', apiUrl);
         
         try {
@@ -341,7 +341,7 @@ export default function ContentPage({ id }: ContentPageProps) {
               try {
                 // Try to fetch a fresh summary by forcing regeneration
                 const regenerateResponse = await axios.get<SummaryResponse>(
-                  `/api/spaces/generate/summary?content_id=${contentId}&force=true`,
+                  `/api/workspaces/generate/summary?content_id=${contentId}&force=true`,
                   {
                     headers: { 
                       Authorization: `Bearer ${user.token}`,
@@ -605,7 +605,7 @@ export default function ContentPage({ id }: ContentPageProps) {
     try {
       setMindmapLoading(true);
       const response = await axios.get(
-        `/api/spaces/generate/mindmap?content_id=${content_id}`,
+        `/api/workspaces/generate/mindmap?content_id=${content_id}`,
         {
           headers: {
             Authorization: `Bearer ${user?.token}`
@@ -647,7 +647,7 @@ export default function ContentPage({ id }: ContentPageProps) {
       
       // Force refresh by adding a timestamp to avoid caching issues
       const timestamp = new Date().getTime();
-      const apiUrl = `/api/spaces/generate/audio?content_id=${content_id}&_t=${timestamp}`;
+      const apiUrl = `/api/workspaces/generate/audio?content_id=${content_id}&_t=${timestamp}`;
       console.log('Audio API URL:', apiUrl);
       
       // Define the exact API response structure from the server

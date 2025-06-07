@@ -65,7 +65,7 @@ export default function SpacePage() {
   const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
   const forcedRefresh = searchParams?.get('t') || null;
 
-  const fetchSpaceContents = React.useCallback(async () => {
+  const fetchWorkspaceContents = React.useCallback(async () => {
     if (isFetchingRef.current || !user?.token) return;
     
     isFetchingRef.current = true;
@@ -74,8 +74,8 @@ export default function SpacePage() {
     try {
       // Add cache busting to prevent stale data
       const timestamp = Date.now();
-      const endpoint = `/api/spaces?space_id=${spaceId}&_nocache=${timestamp}`;
-      console.log("[DEBUG] Fetching space contents from:", endpoint);
+      const endpoint = `/api/workspaces/${spaceId}?_nocache=${timestamp}`;
+      console.log("[DEBUG] Fetching workspace contents from:", endpoint);
       
       const res = await fetch(endpoint, {
         method: 'GET',
@@ -94,16 +94,15 @@ export default function SpacePage() {
       const data = await res.json();
       console.log("[DEBUG] API response data:", data);
       
-      if (!data || !data.spaces || !Array.isArray(data.spaces)) {
+      if (!data || !data.workspace) {
         console.error("[ERROR] Invalid API response format:", data);
         throw new Error("Invalid API response format");
       }
       
-      const { spaces } = data;
-      const space = spaces[0];
+      const space = data.workspace;
       
       if (space) {
-        console.log("[DEBUG] Found space with", space.contents?.length || 0, "content items");
+        console.log("[DEBUG] Found workspace with", space.contents?.length || 0, "content items");
         // Always ensure contents is a valid array
         const safeContents = Array.isArray(space.contents) ? space.contents : [];
         
@@ -111,19 +110,19 @@ export default function SpacePage() {
         if (safeContents.length > 0) {
           console.log("[DEBUG] Content items found:", safeContents.map((c: ContentItem) => ({ id: c.id, type: c.type, title: c.title })));
         } else {
-          console.log("[DEBUG] No content items found in the space");
+          console.log("[DEBUG] No content items found in the workspace");
         }
         
         setLocalContents(safeContents);
         // Mark as fetched
         hasFetchedRef.current = true;
       } else {
-        console.warn("[DEBUG] No space data found in API response");
+        console.warn("[DEBUG] No workspace data found in API response");
         setLocalContents([]);
       }
     } catch (error) {
-      console.error("[ERROR] Error fetching space contents:", error);
-      toast.error("Failed to load space contents");
+      console.error("[ERROR] Error fetching workspace contents:", error);
+      toast.error("Failed to load workspace contents");
       setLocalContents([]);
     } finally {
       setIsLoading(false);
@@ -177,20 +176,20 @@ export default function SpacePage() {
       if (isForceRefresh) {
         console.log('[DEBUG] Force refresh detected from URL parameter');
         // We'll do multiple fetches for reliability
-        fetchSpaceContents();
+        fetchWorkspaceContents();
         
         // Try again after a short delay in case the first fetch was too early
         const timer = setTimeout(() => {
           if (mounted && !hasFetchedRef.current) {
             console.log('[DEBUG] Retry fetch after delay');
-            fetchSpaceContents();
+            fetchWorkspaceContents();
           }
         }, 500);
         
         return () => clearTimeout(timer);
       } else {
         // Regular navigation - just fetch once
-        fetchSpaceContents();
+        fetchWorkspaceContents();
       }
     };
     
@@ -201,22 +200,22 @@ export default function SpacePage() {
       mounted = false;
       setShow(false);
     };
-  }, [isAuthenticated, loading, spaceId, fetchSpaceContents, setShow]);
+  }, [isAuthenticated, loading, spaceId, fetchWorkspaceContents, setShow]);
 
   // Show loading state if not authenticated or still loading spaces
   if (!isAuthenticated || loading) {
     return <p>Loading...</p>;
   }
 
-  // Find the specific space by ID from the global store
-  const spaceData = spaces.find((space) => space.id === spaceId) || null;
+  // Find the specific workspace by ID from the global store
+  const workspaceData = spaces.find((space) => space.id === spaceId) || null;
 
-  if (!spaceData) {
-    return <p>Space not found</p>;
+  if (!workspaceData) {
+    return <p>Workspace not found</p>;
   }
 
   // Keep this for any future UI differences, but delete will work everywhere
-  const isPersonalWorkspace = spaceData.name.toLowerCase().includes("personal") && spaceData.name.toLowerCase().includes("workspace");
+  const isPersonalWorkspace = workspaceData.name.toLowerCase().includes("personal") && workspaceData.name.toLowerCase().includes("workspace");
 
   // Function to delete content from the workspace
   const handleDeleteContent = async (contentId: string) => {
@@ -268,7 +267,7 @@ export default function SpacePage() {
       console.log("[DEBUG] Deleting workspace:", spaceId);
       
       // Delete the workspace
-      const res = await fetch(`/api/spaces/${spaceId}`, {
+      const res = await fetch(`/api/workspaces/${spaceId}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${user?.token}`,
@@ -298,7 +297,7 @@ export default function SpacePage() {
       <main className="container py-8 px-4 md:px-8">
         <div className="flex justify-between items-start w-full mb-8">
           <h1 className="text-4xl font-bold tracking-tight pt-4 text-[#5B4B8A] dark:text-white">
-            {isPersonalWorkspace ? "Personal Workspace" : spaceData.name}
+            {isPersonalWorkspace ? "Personal Workspace" : workspaceData.name}
           </h1>
           <BackButton onClick={() => router.push("/dashboard/workspaces")} />
         </div>

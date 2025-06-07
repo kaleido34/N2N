@@ -43,7 +43,7 @@ export function TermBuilderDialog({ contentId, youtubeId }: TermBuilderDialogPro
     setError(null);
 
     try {
-      const response = await fetch(`/api/spaces/generate/termbuilder`, {
+      const response = await fetch(`/api/workspaces/generate/termbuilder`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

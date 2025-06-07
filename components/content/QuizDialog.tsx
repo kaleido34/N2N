@@ -141,7 +141,7 @@ export function QuizDialog({ contentId, youtubeId }: QuizDialogProps) {
 
     try {
       const response = await axios.get(
-        `/api/spaces/generate/quiz?content_id=${contentId}`,
+        `/api/workspaces/generate/quiz?content_id=${contentId}`,
         {
           headers: {
             Authorization: `Bearer ${user?.token}`

@@ -72,9 +72,9 @@ export const useSpacesStore = create(
 
       setLoading: (val) => set({ loading: val }),
 
-      // Create a new space via POST /api/spaces
+      // Create a new workspace via POST /api/workspaces
       async createSpace(token, name) {
-        const res = await fetch("/api/spaces", {
+        const res = await fetch("/api/workspaces", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -123,9 +123,9 @@ export const useSpacesStore = create(
 
       // Track last refresh time to prevent excessive API calls
       
-      // Refresh spaces list from the server
-      async refreshSpaces(token, forceRefresh = false) {
-        const endpoint = "/api/spaces";
+        // Refresh workspaces list from the server
+        async refreshSpaces(token: string, forceRefresh = false) {
+          const endpoint = "/api/workspaces";
         const now = Date.now();
         
         // Enhanced debouncing to prevent repeated API calls
@@ -190,16 +190,16 @@ export const useSpacesStore = create(
             const data = await res.json();
             
             // Check if the response has the expected structure
-            if (!data || !data.spaces || !Array.isArray(data.spaces)) {
-              console.error('[ERROR] Unexpected response format from /api/spaces:', data);
+            if (!data || !data.workspaces || !Array.isArray(data.workspaces)) {
+              console.error('[ERROR] Unexpected response format from /api/workspaces:', data);
               set({ loading: false });
               return;
             }
             
-            console.log('[DEBUG] got spaces from API:', data.spaces.length);
+            console.log('[DEBUG] got workspaces from API:', data.workspaces.length);
             
-            // Transform the spaces data to ensure consistent structure
-            const transformedSpaces = data.spaces.map((space: any) => ({
+            // Transform the workspaces data to ensure consistent structure
+            const transformedSpaces = data.workspaces.map((space: any) => ({
               ...space,
               contents: space.contents?.map((content: any) => ({
                 ...content,

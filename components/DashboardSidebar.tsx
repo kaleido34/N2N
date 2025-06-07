@@ -29,16 +29,16 @@ const PanelIcon = ({ className = "w-6 h-6" }) => (
 
 export default function DashboardSidebar({ minimized, setMinimized }: { minimized: boolean; setMinimized: (v: boolean) => void }) {
   const { user, logout } = useAuth();
-  const { spaces, addSpace, refreshSpaces, setSpaces } = useSpaces();
+  const { spaces: workspaces, addSpace, refreshSpaces, setSpaces } = useSpaces();
   const router = useRouter ? useRouter() : { push: () => {} };
   const getInitials = (name: string) => name?.split(" ").map((part: string) => part[0]).join("").toUpperCase();
 
   // Find the personal workspace by exact name (case-insensitive)
-  const personalWorkspace = spaces.find(space => space.name.trim().toLowerCase() === "personal workspace");
+  const personalWorkspace = workspaces.find((space: any) => space.name.trim().toLowerCase() === "personal workspace");
   const lessonHistory = personalWorkspace?.contents || [];
 
-  // Debug: Log spaces and lessonHistory for troubleshooting
-  console.log('[DEBUG] DashboardSidebar spaces:', spaces);
+  // Debug: Log workspaces and lessonHistory for troubleshooting
+  console.log('[DEBUG] DashboardSidebar workspaces:', workspaces);
   console.log('[DEBUG] DashboardSidebar lessonHistory:', lessonHistory);
 
   // Delete lesson handler
@@ -54,9 +54,9 @@ export default function DashboardSidebar({ minimized, setMinimized }: { minimize
       // No need to update local state, global store will update lessonHistory
       if (personalWorkspace) {
         setSpaces(
-          spaces.map((space) =>
+          workspaces.map((space: any) =>
             space.id === personalWorkspace.id
-              ? { ...space, contents: (space.contents || []).filter((item) => item.id !== lessonId) }
+              ? { ...space, contents: (space.contents || []).filter((item: any) => item.id !== lessonId) }
               : space
           )
         );
@@ -74,7 +74,7 @@ export default function DashboardSidebar({ minimized, setMinimized }: { minimize
       return;
     }
     try {
-      const res = await fetch("/api/spaces", {
+      const res = await fetch("/api/workspaces", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -220,7 +220,7 @@ export default function DashboardSidebar({ minimized, setMinimized }: { minimize
               {lessonHistory.length === 0 && (
                 <div className="text-xs text-muted-foreground dark:text-white pl-3 py-2">No lessons yet.</div>
               )}
-              {lessonHistory.map(lesson => (
+              {lessonHistory.map((lesson: any) => (
                 <div
                   key={lesson.id}
                   className="truncate text-xs text-[#232323] dark:text-white px-2 py-1 group hover:bg-[#f3f0ff] dark:hover:bg-[#23223a] rounded transition cursor-pointer pl-3 flex items-center justify-between"

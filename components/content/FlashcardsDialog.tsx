@@ -78,7 +78,7 @@ export function FlashcardsDialog({ contentId, youtubeId }: FlashcardsDialogProps
 
     try {
       const response = await axios.get(
-        `/api/spaces/generate/flashcards?content_id=${contentId}`,
+        `/api/workspaces/generate/flashcards?content_id=${contentId}`,
         {
           headers: {
             Authorization: `Bearer ${user?.token}`

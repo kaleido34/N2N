@@ -112,7 +112,7 @@ export default function RestoredDashboardLayout({
         thumbnailUrl: data.thumbnail_url,
       });
 
-      router.replace(`/dashboard/spaces/${data.space_id}`);
+      router.replace(`/dashboard/workspaces/${data.space_id}`);
     } catch (err) {
       console.error("Error creating content:", err);
     } finally {
@@ -137,17 +137,17 @@ export default function RestoredDashboardLayout({
 
     async function loadInitialSpaces() {
       try {
-        const res = await fetch("/api/spaces", {
+        const res = await fetch("/api/workspaces", {
           headers: { Authorization: `Bearer ${user?.token ?? ""}` },
           signal
         });
         
         if (signal.aborted) return;
-        if (!res.ok) throw new Error("Failed to fetch spaces");
+        if (!res.ok) throw new Error("Failed to fetch workspaces");
         
         const data = await res.json();
         if (!signal.aborted) {
-          setSpaces(data.spaces);
+          setSpaces(data.workspaces);
           setInitialLoadDone(true);
         }
       } catch (err) {

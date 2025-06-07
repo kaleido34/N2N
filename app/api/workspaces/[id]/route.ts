@@ -3,16 +3,22 @@ import prisma from "@/lib/prisma";
 import { authenticateUser } from "@/lib/auth-helpers";
 
 /**
- * GET /api/spaces/[id]
- * Fetches a single space by ID, ensuring it belongs to the logged-in user.
- * Also includes the space's content items (YoutubeContent, DocumentContent, etc.)
+ * GET /api/workspaces/[id]
+ * Fetches a single workspace by ID, ensuring it belongs to the logged-in user.
+ * Also includes the workspace's content items (YoutubeContent, DocumentContent, etc.)
  */
 export async function GET(
   request: NextRequest,
+  context: { params: Record<string, string> }
 ) {
   try {
-    const params = request.nextUrl.searchParams;
-    const spaceId = params.get("space_id") || "";
+    // In Next.js App Router we need to handle params asynchronously
+    const params = await context.params;
+    const workspaceId = params.id;
+    
+    if (!workspaceId) {
+      return NextResponse.json({ message: "Workspace ID is required" }, { status: 400 });
+    }
 
     // 1) Authenticate user with centralized helper
     const { user, error } = await authenticateUser(request);
@@ -22,11 +28,11 @@ export async function GET(
     
     const userId = user.user_id;
 
-    // 3) Fetch the space that belongs to this user
+    // 3) Fetch the workspace that belongs to this user
     //    Include any related content (youtube, doc, etc.)
-    const space = await prisma.space.findFirst({
+    const workspace = await prisma.space.findFirst({
       where: {
-        space_id: spaceId,
+        space_id: workspaceId,
         user_id: userId,
       },
       include: {
@@ -46,34 +52,46 @@ export async function GET(
       },
     });
 
-    if (!space) {
-      console.log(`[API] GET /api/spaces/${spaceId} from user ${userId}`);
+    if (!workspace) {
+      console.log(`[API] GET /api/workspaces/${workspaceId} from user ${userId}`);
       return NextResponse.json(
-        { message: "Space not found or not yours" },
+        { message: "Workspace not found or not yours" },
         { status: 404 }
       );
     }
 
     // 4) Transform to a simpler shape for the front-end if needed
     const transformed = {
-      id: space.space_id,
-      name: space.space_name,
-      createdAt: space.created_at,
-      contents: space.contents.map((spaceContent: any) => ({
+      id: workspace.space_id,
+      name: workspace.space_name,
+      createdAt: workspace.created_at,
+      contents: workspace.contents.map((spaceContent: any) => ({
         id: spaceContent.content.content_id,
         type: spaceContent.content.content_type,
         createdAt: spaceContent.content.created_at,
-        title: spaceContent.content.youtubeContent?.title ?? null,
-        thumbnailUrl:
-          spaceContent.content.youtubeContent?.thumbnail_url ?? null,
-        filename: spaceContent.content.documentContent?.filename ?? null,
-        fileUrl: spaceContent.content.documentContent?.file_url ?? null,
+        // Get title from the appropriate content type
+        title: spaceContent.content.youtubeContent?.title || 
+               spaceContent.content.imageContent?.title ||
+               spaceContent.content.audioContent?.title ||
+               spaceContent.content.documentContent?.filename ||
+               null,
+        thumbnailUrl: spaceContent.content.youtubeContent?.thumbnail_url || null,
+        // Include filename and fileUrl for all content types
+        filename: spaceContent.content.documentContent?.filename || 
+                 spaceContent.content.imageContent?.image_url ||
+                 spaceContent.content.audioContent?.file_url ||
+                 null,
+        fileUrl: spaceContent.content.documentContent?.file_url ||
+                spaceContent.content.imageContent?.image_url ||
+                spaceContent.content.audioContent?.file_url ||
+                null,
+        youtube_id: spaceContent.content.youtubeContent?.youtube_id || null,
       })),
     };
 
-    return NextResponse.json({ space: transformed }, { status: 200 });
+    return NextResponse.json({ workspace: transformed }, { status: 200 });
   } catch (error) {
-    console.error("Error fetching space:", error);
+    console.error("Error fetching workspace:", error);
     return NextResponse.json(
       { message: "Internal server error" },
       { status: 500 }
@@ -88,10 +106,10 @@ export async function DELETE(
   try {
     // In Next.js App Router we need to handle params asynchronously
     const params = await context.params;
-    const spaceId = params.id;
+    const workspaceId = params.id;
     
-    if (!spaceId) {
-      return NextResponse.json({ message: "Space ID is required" }, { status: 400 });
+    if (!workspaceId) {
+      return NextResponse.json({ message: "Workspace ID is required" }, { status: 400 });
     }
 
     // Extract auth headers - try multiple variations to ensure we get the token
@@ -151,31 +169,31 @@ export async function DELETE(
     const decodedUser = verificationResult.payload;
     const userId = decodedUser.user_id;
     
-    // Check if space exists and belongs to user
-    const space = await prisma.space.findFirst({
+    // Check if workspace exists and belongs to user
+    const workspace = await prisma.space.findFirst({
       where: {
-        space_id: spaceId,
+        space_id: workspaceId,
         user_id: userId,
       },
     });
 
-    if (!space) {
+    if (!workspace) {
       return NextResponse.json(
-        { message: "Space not found or not owned by you" },
+        { message: "Workspace not found or not owned by you" },
         { status: 403 }
       );
     }
 
-    // Delete the space
+    // Delete the workspace
     await prisma.space.delete({
       where: {
-        space_id: spaceId,
+        space_id: workspaceId,
       },
     });
 
-    return NextResponse.json({ message: "Space deleted successfully" });
+    return NextResponse.json({ message: "Workspace deleted successfully" });
   } catch (error) {
-    console.error("Error deleting space:", error);
+    console.error("Error deleting workspace:", error);
     return NextResponse.json(
       { message: "Internal server error" },
       { status: 500 }

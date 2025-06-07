@@ -140,7 +140,7 @@ export default function SpacesPage() {
     try {
       console.log("[DEBUG] Creating new workspace:", name);
       
-      const res = await fetch("/api/spaces", {
+      const res = await fetch("/api/workspaces", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -192,7 +192,7 @@ export default function SpacesPage() {
 
     try {
       // First, delete the workspace
-      const res = await fetch(`/api/spaces/${spaceId}`, {
+      const res = await fetch(`/api/workspaces/${spaceId}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${user.token}`,
