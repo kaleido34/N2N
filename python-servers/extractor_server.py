@@ -17,24 +17,11 @@ import io
 # Audio transcription
 import whisper
 
-# Embedding model
-from sentence_transformers import SentenceTransformer
-
 app = Flask(__name__)
 CORS(app)
 
 # Load whisper model (small for better balance of accuracy and speed)
 whisper_model = whisper.load_model("small")
-
-# Embedding model (for /embed)
-embedding_model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
-
-@app.route('/embed', methods=['POST'])
-def embed():
-    data = request.json
-    sentences = data['inputs']
-    embeddings = embedding_model.encode(sentences).tolist()
-    return jsonify({'embeddings': embeddings})
 
 @app.route('/extract/pdf', methods=['POST'])
 def extract_pdf():

@@ -1,0 +1,16 @@
+# Core Flask dependencies
+flask
+flask-cors
+
+# PDF processing
+PyPDF2
+
+# Image processing and OCR
+Pillow
+pytesseract
+
+# Audio transcription
+openai-whisper
+
+# Basic utilities
+python-dotenv 
