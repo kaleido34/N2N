@@ -27,77 +27,82 @@ export default function SpacesPage() {
   const { copiedLessons, hasCopiedLessons, clearClipboard } = useClipboard();
   const router = useRouter();
 
+  // Stabilized loading state to prevent flashing
+  const [isStableLoading, setIsStableLoading] = useState(true);
+  const [hasInitialized, setHasInitialized] = useState(false);
+  const initRef = useRef(false);
+
   console.log('[DEBUG] SpacesPage render', { 
     isAuthenticated, 
     hasToken: !!user?.token,
     loading,
-    spacesCount: spaces.length 
+    spacesCount: spaces.length,
+    isStableLoading,
+    hasInitialized
   });
 
+  // Redirect if not authenticated - but don't block render
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (hasInitialized && !isAuthenticated) {
       router.replace("/signin");
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, router, hasInitialized]);
 
-  // Add effect to fetch spaces only once when the component mounts
-  const [hasFetched, setHasFetched] = useState(false);
-  const isFetchingRef = useRef(false);
-  const mountedRef = useRef(false);
-  
+  // Single initialization effect with stabilized loading
   useEffect(() => {
-    // Only run this effect once on component mount
-    if (mountedRef.current) return;
-    mountedRef.current = true;
-    
-    console.log('[DEBUG] SpacesPage mounted', { 
-      isAuthenticated, 
-      hasToken: !!user?.token, 
-      loading,
-      spacesCount: spaces?.length || 0
-    });
-    
-    const fetchSpaces = async () => {
-      // Don't fetch if we're already loading or if already fetched
-      if (isFetchingRef.current || hasFetched || !isAuthenticated || !user?.token) return;
-      
-      // Set fetching flag to prevent duplicate calls
-      isFetchingRef.current = true;
-      
+    if (initRef.current) return;
+    initRef.current = true;
+
+    const initializePage = async () => {
+      console.log('[DEBUG] SpacesPage initializing', { 
+        isAuthenticated, 
+        hasToken: !!user?.token 
+      });
+
+      // Wait a small moment to ensure auth state is stable
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      if (!isAuthenticated || !user?.token) {
+        setHasInitialized(true);
+        setIsStableLoading(false);
+        return;
+      }
+
       try {
-        console.log('[DEBUG] SpacesPage initiating fetch');
-        await refreshSpaces(user.token, true); // Force refresh once on page load
-        setHasFetched(true);
+        // Only fetch if we don't have spaces data
+        if (!spaces || spaces.length === 0) {
+          await refreshSpaces(user.token, true);
+        }
       } catch (error) {
-        console.error('Error fetching spaces:', error);
+        console.error('Error initializing spaces:', error);
         toast.error('Failed to load workspaces');
       } finally {
-        // Reset fetching flag after a delay
+        setHasInitialized(true);
+        // Add a slight delay to prevent flash
         setTimeout(() => {
-          isFetchingRef.current = false;
-        }, 3000);
+          setIsStableLoading(false);
+        }, 200);
       }
     };
 
-    // Use a slight delay to ensure we don't make redundant calls
-    const timer = setTimeout(() => {
-      fetchSpaces();
-    }, 100);
-    
-    // Cleanup function
-    return () => {
-      clearTimeout(timer);
-      isFetchingRef.current = false;
-    };
-  }, []); // Empty dependency array ensures this only runs once on mount
+    initializePage();
+  }, []); // Only run once
 
-  // Show loading state if not authenticated or still loading
-  if (!isAuthenticated || (loading && !hasFetched)) {
+  // Show stable loading state until everything is ready
+  if (isStableLoading || (!hasInitialized && isAuthenticated)) {
     return (
       <div className="min-h-full flex flex-col items-center justify-center dark:bg-gray-900 py-20">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#5B4B8A]"></div>
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#5B4B8A]"></div>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Loading workspaces...</p>
+        </div>
       </div>
     );
+  }
+
+  // Redirect if not authenticated after initialization
+  if (hasInitialized && !isAuthenticated) {
+    return null; // Return null while redirecting
   }
 
   // Show empty state if there are no spaces
@@ -156,11 +161,9 @@ export default function SpacesPage() {
         throw new Error(error.message || "Failed to create space");
       }
       
-      // Get the newly created workspace data
       const createdWorkspace = await res.json();
       console.log("[DEBUG] Workspace created successfully:", createdWorkspace);
       
-      // Manually add the workspace to the spaces array
       const newSpace = {
         id: createdWorkspace.id,
         name: createdWorkspace.name,
@@ -168,15 +171,12 @@ export default function SpacesPage() {
         contents: []
       };
       
-      // Add the new space to the spaces array
       addSpace(newSpace);
       
-      // Force refresh spaces from server to ensure everything is in sync
+      // Refresh without flashing
       await refreshSpaces(user.token, true);
       
-      // Instead of a full page refresh, use the router to refresh the current page
-      // This triggers a re-render without a full page reload
-      router.refresh();
+      toast.success('Workspace created successfully!');
     } catch (error) {
       console.error('Error creating space:', error);
       toast.error('Failed to create workspace');

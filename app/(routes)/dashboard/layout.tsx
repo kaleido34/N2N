@@ -8,9 +8,9 @@ import { useRouter, usePathname } from "next/navigation";
 import DashboardSidebar from "@/components/DashboardSidebar";
 
 /**
- * This is a restored version of the dashboard layout with fixes for the render loop issues
+ * Optimized dashboard layout with stabilized loading to prevent flashing
  */
-export default function RestoredDashboardLayout({
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -21,10 +21,11 @@ export default function RestoredDashboardLayout({
   const pathname = usePathname();
   const [isLoading, setIsLoading] = useState(false);
   const { isAuthenticated, user } = useAuth();
-  const { setSpaces, setLoading, loading, addContentToSpace } = useSpaces();
+  const { spaces, loading, initialized, setSpaces, addContentToSpace, refreshSpaces } = useSpaces();
   const [minimized, setMinimized] = useState(false);
   const [mediaDropdownOpen, setMediaDropdownOpen] = useState(false);
-  const [initialLoadDone, setInitialLoadDone] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+  const initRef = useRef(false);
   const router = useRouter();
 
   // Memoize all handlers with useCallback to prevent unnecessary re-renders
@@ -121,48 +122,53 @@ export default function RestoredDashboardLayout({
     }
   }, [inputValue, pathname, user, addContentToSpace, router]);
 
-  // Redirect if not authenticated
+  // Single initialization effect to handle auth and spaces
   useEffect(() => {
-    if (!isAuthenticated || !user?.token) {
-      router.replace("/signin");
-    }
-  }, [isAuthenticated, user?.token, router]);
+    if (initRef.current) return;
+    initRef.current = true;
 
-  // Load spaces once
-  useEffect(() => {
-    if (!user?.token || !isAuthenticated || initialLoadDone || !loading) return;
-    
-    const controller = new AbortController();
-    const signal = controller.signal;
+    const initialize = async () => {
+      console.log('[DEBUG] Dashboard initializing', { 
+        isAuthenticated, 
+        hasToken: !!user?.token,
+        initialized 
+      });
 
-    async function loadInitialSpaces() {
-      try {
-        const res = await fetch("/api/workspaces", {
-          headers: { Authorization: `Bearer ${user?.token ?? ""}` },
-          signal
-        });
-        
-        if (signal.aborted) return;
-        if (!res.ok) throw new Error("Failed to fetch workspaces");
-        
-        const data = await res.json();
-        if (!signal.aborted) {
-          setSpaces(data.workspaces);
-          setInitialLoadDone(true);
-        }
-      } catch (err) {
-        if (!signal.aborted) {
-          console.error(err);
+      // Wait for auth state to stabilize
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      if (!isAuthenticated || !user?.token) {
+        router.replace("/signin");
+        return;
+      }
+
+      // Only fetch spaces if not already initialized
+      if (!initialized && !loading) {
+        try {
+          await refreshSpaces(user.token, true);
+        } catch (error) {
+          console.error('Failed to initialize spaces:', error);
         }
       }
+
+      // Mark as ready after a short delay to prevent flash
+      setTimeout(() => {
+        setIsReady(true);
+      }, 150);
+    };
+
+    initialize();
+  }, []); // Only run once
+
+  // Redirect effect (separate from initialization)
+  useEffect(() => {
+    if (isReady && !isAuthenticated) {
+      router.replace("/signin");
     }
+  }, [isAuthenticated, router, isReady]);
 
-    loadInitialSpaces();
-    return () => controller.abort();
-  }, [user?.token, isAuthenticated, loading, initialLoadDone, setSpaces]);
-
-  // Loading screen
-  if (!isAuthenticated || loading) {
+  // Show loading screen with stabilized state
+  if (!isReady || !isAuthenticated || (!initialized && loading)) {
     return (
       <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white/80 dark:bg-[#18132A]/80 transition-colors duration-300">
         <div className="flex flex-col items-center gap-6">
@@ -176,6 +182,7 @@ export default function RestoredDashboardLayout({
           <div className="mt-4">
             <span className="inline-block h-6 w-6 rounded-full border-4 border-[#7B5EA7] border-t-transparent animate-spin dark:border-[#C7AFFF] dark:border-t-transparent"></span>
           </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">Loading dashboard...</p>
         </div>
       </div>
     );

@@ -32,6 +32,7 @@ export interface SpaceItem {
 interface SpacesState {
   spaces: SpaceItem[];
   loading: boolean;
+  initialized: boolean;
   _lastRefreshTime: number;
 }
 
@@ -39,6 +40,7 @@ interface SpacesActions {
   setSpaces: (spaces: SpaceItem[]) => void;
   addSpace: (space: SpaceItem) => void;
   setLoading: (val: boolean) => void;
+  setInitialized: (val: boolean) => void;
   createSpace: (token: string, name: string) => Promise<void>;
   addContentToSpace: (spaceId: string, content: ContentItem) => void;
   resetSpaces: () => void;
@@ -47,20 +49,20 @@ interface SpacesActions {
 
 // Global API call tracker to prevent multiple components from making simultaneous calls
 let isApiCallInProgress = false;
-let apiCallTimeout: NodeJS.Timeout | null = null;
 let lastSuccessfulCallTime = 0;
-const MIN_API_CALL_INTERVAL = 5000; // 5 seconds between API calls
+const MIN_API_CALL_INTERVAL = 2000; // Reduced to 2 seconds for better UX
 
 // Create our Zustand store
 export const useSpacesStore = create(
   persist<SpacesState & SpacesActions>(
     (set, get) => ({
       spaces: [],
-      loading: true,
+      loading: false, // Changed default to false to prevent initial flash
+      initialized: false,
       _lastRefreshTime: 0,
 
       setSpaces: (spaces) => {
-        set({ spaces, loading: false });
+        set({ spaces, loading: false, initialized: true });
       },
 
       addSpace: (space) =>
@@ -70,7 +72,20 @@ export const useSpacesStore = create(
           return { spaces: [...state.spaces, space] };
         }),
 
-      setLoading: (val) => set({ loading: val }),
+      setLoading: (val) => {
+        const state = get();
+        // Only update if the value is actually changing
+        if (state.loading !== val) {
+          set({ loading: val });
+        }
+      },
+
+      setInitialized: (val) => {
+        const state = get();
+        if (state.initialized !== val) {
+          set({ initialized: val });
+        }
+      },
 
       // Create a new workspace via POST /api/workspaces
       async createSpace(token, name) {
@@ -112,35 +127,30 @@ export const useSpacesStore = create(
           console.error('Error clearing spaces cache:', error);
         }
         
-        set((state) => {
-          if (state.spaces.length === 0 && !state.loading) return state;
-          return {
-            spaces: [],
-            loading: true,
-          };
+        set({
+          spaces: [],
+          loading: false,
+          initialized: false,
         });
       },
 
-      // Track last refresh time to prevent excessive API calls
-      
-        // Refresh workspaces list from the server
-        async refreshSpaces(token: string, forceRefresh = false) {
-          const endpoint = "/api/workspaces";
+      // Refresh workspaces list from the server with better state management
+      async refreshSpaces(token: string, forceRefresh = false) {
+        const endpoint = "/api/workspaces";
         const now = Date.now();
+        const state = get();
         
         // Enhanced debouncing to prevent repeated API calls
         if (!forceRefresh) {
           // Check if we've made a successful call recently
           if (now - lastSuccessfulCallTime < MIN_API_CALL_INTERVAL) {
             console.log('[DEBUG] skipping refresh - too soon after last successful call');
-            set({ loading: false });
             return;
           }
           
           // Use the API limiter as a secondary check
           if (!shouldAllowApiCall(endpoint, MIN_API_CALL_INTERVAL)) {
             console.log('[DEBUG] skipping refresh - rate limited');
-            set({ loading: false });
             return;
           }
         }
@@ -151,13 +161,18 @@ export const useSpacesStore = create(
           return;
         }
         
-        const state = get();
-        console.log('[DEBUG] refreshSpaces called', { hasToken: !!token, spaces: state.spaces.length, loading: state.loading, forceRefresh });
+        console.log('[DEBUG] refreshSpaces called', { 
+          hasToken: !!token, 
+          spaces: state.spaces.length, 
+          loading: state.loading, 
+          initialized: state.initialized,
+          forceRefresh 
+        });
         
         // Skip if no token
         if (!token) {
           console.log('[DEBUG] skipping refresh - no token');
-          set({ loading: false });
+          get().setInitialized(true);
           return;
         }
         
@@ -166,104 +181,113 @@ export const useSpacesStore = create(
         
         // Update last refresh time
         set({ _lastRefreshTime: now });
-        set({ loading: true });
+        
+        // Only set loading if we're not initialized or force refresh
+        if (!state.initialized || forceRefresh) {
+          get().setLoading(true);
+        }
         
         try {
           console.log('[DEBUG] fetching spaces from API');
-          try {
-            const res = await fetch(endpoint, {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-              // Add cache control to prevent browser caching
-              cache: 'no-store',
-            });
-            
-            // Handle non-OK responses more gracefully
-            if (!res.ok) {
-              console.error(`[ERROR] Failed to fetch spaces: ${res.status} ${res.statusText}`);
-              // Don't throw, just set loading to false and return
-              set({ loading: false });
-              return;
-            }
-            
-            const data = await res.json();
-            
-            // Check if the response has the expected structure
-            if (!data || !data.workspaces || !Array.isArray(data.workspaces)) {
-              console.error('[ERROR] Unexpected response format from /api/workspaces:', data);
-              set({ loading: false });
-              return;
-            }
-            
-            console.log('[DEBUG] got workspaces from API:', data.workspaces.length);
-            
-            // Transform the workspaces data to ensure consistent structure
-            const transformedSpaces = data.workspaces.map((space: any) => ({
-              ...space,
-              contents: space.contents?.map((content: any) => ({
-                ...content,
-                // Ensure title is set from either title or filename
-                title: content.title || content.filename || 'Untitled',
-                // Ensure type is in the correct format
-                type: content.type || 'UNKNOWN'
-              })) || []
-            }));
-            
-            set({ spaces: transformedSpaces, loading: false });
-            
-            // Update the last successful call time
-            lastSuccessfulCallTime = Date.now();
-          } catch (fetchError) {
-            console.error('[ERROR] Exception while fetching spaces:', fetchError);
-            set({ loading: false });
-          } finally {
-            // Clear the in-progress flag
-            isApiCallInProgress = false;
-            markApiCallCompleted(endpoint);
+          const res = await fetch(endpoint, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            // Add cache control to prevent browser caching
+            cache: 'no-store',
+          });
+          
+          // Handle non-OK responses more gracefully
+          if (!res.ok) {
+            console.error(`[ERROR] Failed to fetch spaces: ${res.status} ${res.statusText}`);
+            get().setLoading(false);
+            get().setInitialized(true);
+            return;
           }
-        } catch (error) {
-          console.error("Error refreshing spaces:", error);
-          set({ loading: false });
-          isApiCallInProgress = false;
+          
+          const data = await res.json();
+          
+          // Check if the response has the expected structure
+          if (!data || !data.workspaces || !Array.isArray(data.workspaces)) {
+            console.error('[ERROR] Unexpected response format from /api/workspaces:', data);
+            get().setLoading(false);
+            get().setInitialized(true);
+            return;
+          }
+          
+          console.log('[DEBUG] got workspaces from API:', data.workspaces.length);
+          
+          // Transform workspaces to match expected format
+          const transformedSpaces: SpaceItem[] = data.workspaces.map((ws: any) => ({
+            id: ws.space_id || ws.id,
+            name: ws.space_name || ws.name || "Untitled Space",
+            createdAt: ws.created_at || new Date().toISOString(),
+            contents: (ws.contents || []).map((content: any) => ({
+              id: content.content_id || content.id,
+              youtube_id: content.youtube_id,
+              type: content.content_type || content.type || "UNKNOWN",
+              title: content.title || content.youtube_title || content.filename || "Untitled",
+              thumbnailUrl: content.thumbnail_url || content.thumbnailUrl,
+              filename: content.filename,
+              fileUrl: content.file_url || content.fileUrl,
+              description: content.description,
+              image_url: content.image_url,
+              text: content.text,
+              createdAt: content.created_at || content.createdAt,
+            })),
+          }));
+          
+          console.log('[DEBUG] setting transformed spaces:', transformedSpaces.length);
+          
+          // Use setSpaces which also sets loading=false and initialized=true
+          get().setSpaces(transformedSpaces);
+          
+          // Mark successful API call
+          lastSuccessfulCallTime = now;
           markApiCallCompleted(endpoint);
+          
+        } catch (error) {
+          console.error('[ERROR] Failed to fetch spaces:', error);
+          get().setLoading(false);
+          get().setInitialized(true);
+        } finally {
+          // Always reset the API call flag after a delay
+          setTimeout(() => {
+            isApiCallInProgress = false;
+          }, 1000);
         }
       },
     }),
     {
-      name: "spaces-storage", // key for localStorage
+      name: "spaces-storage",
+      // Add version for cache invalidation if needed
+      version: 1,
     }
   )
 );
 
-const SpacesContext = createContext<(SpacesState & SpacesActions) | null>(null);
-
+// Provider component to handle space reset events
 export function SpacesProvider({ children }: { children: ReactNode }) {
-  const store = useSpacesStore();
+  const resetSpaces = useSpacesStore((state) => state.resetSpaces);
 
-  // Listen for reset events from AuthProvider instead of direct function calls
-  // This breaks the circular dependency
   useEffect(() => {
     const handleResetSpaces = () => {
-      console.log("Spaces reset triggered by auth event");
-      store.resetSpaces();
+      console.log('[DEBUG] SpacesProvider received reset event');
+      resetSpaces();
     };
 
+    // Listen for reset events from AuthProvider
     window.addEventListener('auth:resetSpaces', handleResetSpaces);
+    
     return () => {
       window.removeEventListener('auth:resetSpaces', handleResetSpaces);
     };
-  }, [store]);
+  }, [resetSpaces]);
 
-  return (
-    <SpacesContext.Provider value={store}>{children}</SpacesContext.Provider>
-  );
+  return <>{children}</>;
 }
 
+// Custom hook to access spaces store
 export function useSpaces() {
-  const context = useContext(SpacesContext);
-  if (!context) {
-    throw new Error("useSpaces must be used within a SpacesProvider");
-  }
-  return context;
+  return useSpacesStore();
 }
