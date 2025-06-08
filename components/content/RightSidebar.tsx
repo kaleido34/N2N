@@ -39,8 +39,6 @@ import { TranscriptsDialog } from "./TranscriptsDialog";
 interface RightSidebarProps {
   contentId?: string;
   youtubeId?: string;
-  mindmapData: any;
-  mindmapLoading: boolean;
   audioData: any;
   audioLoading: boolean;
   transcriptData: any;
@@ -50,8 +48,6 @@ interface RightSidebarProps {
 export default function RightSidebar({
   contentId,
   youtubeId,
-  mindmapData,
-  mindmapLoading,
   audioData,
   audioLoading,
   transcriptData,
@@ -118,8 +114,6 @@ export default function RightSidebar({
 
           {/* Create Mindmap */}
           <MindmapDialog 
-            mindmapData={mindmapData}
-            mindmapLoading={mindmapLoading}
             contentId={contentId}
             youtubeId={youtubeId}
           />

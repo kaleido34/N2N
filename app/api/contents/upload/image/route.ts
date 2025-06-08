@@ -13,7 +13,7 @@ async function extractTextFromImageWithPython(file: Blob): Promise<{ image_id: s
   const formData = new FormData();
   formData.append("file", file);
   // Call the Python extractor server
-  const res = await fetch("http://localhost:5005/extract/image", {
+          const res = await fetch(`${process.env.PYTHON_SERVER_URL}/extract/image`, {
     method: "POST",
     body: formData,
   });

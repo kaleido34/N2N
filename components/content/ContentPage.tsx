@@ -43,12 +43,10 @@ export default function ContentPage({ id }: ContentPageProps) {
   const [error, setError] = useState<string | null>(null);
   
   // Data states
-  const [mindmapData, setMindmapData] = useState<any>(null);
   const [audioData, setAudioData] = useState<any>(null);
   const [transcriptData, setTranscriptData] = useState<any>(null);
   
   // Loading states
-  const [mindmapLoading, setMindmapLoading] = useState<boolean>(false);
   const [audioLoading, setAudioLoading] = useState<boolean>(false);
   const [transcriptLoading, setTranscriptLoading] = useState<boolean>(false);
   const [summaryLoading, setSummaryLoading] = useState<boolean>(false);
@@ -581,8 +579,7 @@ export default function ContentPage({ id }: ContentPageProps) {
             
             // Lower priority: Fetch supplementary learning materials in parallel
             await Promise.allSettled([
-              !mindmapData ? fetchWithCache('mindmap', fetchMindmap, data.youtube_id || '', data.id) : Promise.resolve(),
-              // Note: Quiz and Flashcards are now loaded lazily when their dialogs are opened
+              // Note: Mindmap, Quiz and Flashcards are now loaded lazily when their dialogs are opened
             ]);
           } catch (error) {
             console.error('Error loading content data:', error);
@@ -599,34 +596,6 @@ export default function ContentPage({ id }: ContentPageProps) {
     }
   };
   
-  // Fetch mindmap data
-  const fetchMindmap = async (youtube_id: string, content_id: string) => {
-    if (!content_id || !user?.token) return;
-    try {
-      setMindmapLoading(true);
-      const response = await axios.get(
-        `/api/workspaces/generate/mindmap?content_id=${content_id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${user?.token}`
-          }
-        }
-      );
-      // Check if response has data property and it's not null/undefined
-      if (response && response.data && typeof response.data === 'object' && response.data !== null) {
-        const apiResponse = response.data as { data?: any };
-        if (apiResponse.data) {
-          setMindmapData(apiResponse.data);
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching mindmap data:", error);
-    } finally {
-      setMindmapLoading(false);
-    }
-  };
-  
-
   
   // Define audio data interfaces at the component scope for reuse
   interface AudioData {
@@ -799,8 +768,6 @@ export default function ContentPage({ id }: ContentPageProps) {
         <RightSidebar 
           contentId={content.id}
           youtubeId={content.youtube_id}
-          mindmapData={mindmapData}
-          mindmapLoading={mindmapLoading}
           audioData={audioData}
           audioLoading={audioLoading}
           transcriptData={transcriptData}

@@ -13,7 +13,7 @@ async function extractTextFromPDFWithPython(file: Blob): Promise<string> {
   const formData = new FormData();
   formData.append("file", file);
   // Call the Python extractor server
-  const res = await fetch("http://localhost:5005/extract/pdf", {
+  const res = await fetch(`${process.env.PYTHON_SERVER_URL}/extract/pdf`, {
     method: "POST",
     body: formData,
   });
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
   try {
     const formData = new FormData();
     formData.append("file", file);
-    const res = await fetch("http://localhost:5005/extract/pdf", {
+    const res = await fetch(`${process.env.PYTHON_SERVER_URL}/extract/pdf`, {
       method: "POST",
       body: formData,
     });

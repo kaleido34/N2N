@@ -14,7 +14,7 @@ async function extractTextFromAudioWithPython(file: Blob): Promise<{ audio_id: s
   const formData = new FormData();
   formData.append("file", file);
   // Call the Python extractor server
-  const res = await fetch("http://localhost:5005/extract/audio", {
+          const res = await fetch(`${process.env.PYTHON_SERVER_URL}/extract/audio`, {
     method: "POST",
     body: formData,
   });

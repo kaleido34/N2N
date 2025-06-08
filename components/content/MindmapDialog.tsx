@@ -5,18 +5,77 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "@/components/ui/button";
 import * as go from "gojs";
 import { ReactDiagram } from "gojs-react";
+import axios from 'axios';
+import { useAuth } from "@/hooks/auth-provider";
 
 interface MindmapDialogProps {
-  mindmapData: any;
-  mindmapLoading: boolean;
   contentId?: string;
   youtubeId?: string;
 }
 
-export function MindmapDialog({ mindmapData, mindmapLoading, contentId, youtubeId }: MindmapDialogProps) {
+export function MindmapDialog({ contentId, youtubeId }: MindmapDialogProps) {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [mindmapData, setMindmapData] = useState<any>(null);
+  const [mindmapLoading, setMindmapLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
+  // Fetch mindmap data function
+  const fetchMindmap = async () => {
+    if (!contentId || !user?.token) return;
+
+    setMindmapLoading(true);
+    setError(null);
+
+    try {
+      const response = await axios.get(
+        `/api/workspaces/generate/mindmap?content_id=${contentId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${user?.token}`
+          }
+        }
+      );
+      
+      if (response && response.data) {
+        console.log('Mindmap API response:', response.data);
+        let mindmapContent;
+        
+        if (typeof response.data === 'object' && response.data !== null) {
+          // Normal API response format with data property
+          if ('data' in response.data && response.data.data) {
+            mindmapContent = response.data.data;
+          } else {
+            // Use response.data directly
+            mindmapContent = response.data;
+          }
+          
+          if (mindmapContent) {
+            console.log('Setting mindmap data:', mindmapContent);
+            setMindmapData(mindmapContent);
+          }
+        }
+      }
+    } catch (error: any) {
+      console.error("Error fetching mindmap data:", error);
+      if (error?.response?.status === 503) {
+        setError('The AI service is currently overloaded. Please try again in a few moments.');
+      } else {
+        setError('Failed to generate mindmap. Please try again.');
+      }
+    } finally {
+      setMindmapLoading(false);
+    }
+  };
+
+  // Lazy loading when dialog opens
+  useEffect(() => {
+    if (open && !mindmapData && !mindmapLoading) {
+      fetchMindmap();
+    }
+  }, [open, mindmapData, mindmapLoading]);
+
   // Initialize the diagram
   function initDiagram() {
     const $ = go.GraphObject.make;
@@ -236,6 +295,15 @@ export function MindmapDialog({ mindmapData, mindmapLoading, contentId, youtubeI
                     <div className="flex flex-col items-center gap-4">
                       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#5B4B8A]"></div>
                       <p className="text-[#5B4B8A] font-medium">Generating mindmap...</p>
+                    </div>
+                  </div>
+                ) : error ? (
+                  <div className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-white/80">
+                    <div className="text-center p-6">
+                      <p className="text-red-500 mb-4">{error}</p>
+                      <Button onClick={fetchMindmap} variant="outline" className="bg-[#5B4B8A] text-white hover:bg-[#4a3d70]">
+                        Try Again
+                      </Button>
                     </div>
                   </div>
                 ) : mindmapData ? (
