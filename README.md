@@ -38,3 +38,6 @@
 *   Python (v3.8 or later recommended)
 *   PostgreSQL server
 *   Access to services like Supabase, Google AI, Pinecone (and their respective API keys).
+
+
+1234
