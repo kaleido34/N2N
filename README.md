@@ -2,7 +2,7 @@
 
 **noise2nectar** is a web application designed to help users extract valuable insights and structured information from various types of content. It allows users to import documents, YouTube videos, audio files, and images, then processes this content using AI to generate summaries, flashcards, mind maps, quizzes, and more, organizing everything into user-specific "spaces".
 
-## ✨ Key Features
+## Key Features
 
 *   **Multi-Content Ingestion:** Supports YouTube videos, PDF documents, audio files, and images.
 *   **AI-Powered Processing:** Leverages AI (including Google AI and potentially Pinecone for vector search) for:
@@ -16,7 +16,7 @@
 *   **Rich User Interface:** Built with Next.js, React, and Tailwind CSS for a modern and responsive experience.
 *   **Data Visualization:** Includes GoJS for potential diagramming or mind map visualization.
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 *   **Frontend:** Next.js, React, TypeScript, Tailwind CSS
 *   **Backend (Node.js):** Next.js API Routes, Prisma (ORM)
