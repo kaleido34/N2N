@@ -140,8 +140,7 @@ PYTHON_SERVER_URL="https://your-python-server.railway.app"
 ```bash
 FLASK_ENV=production
 PORT=5000
-OPENAI_API_KEY="your-openai-key" # if using OpenAI
-PINECONE_API_KEY="your-pinecone-key" # if using Pinecone
+# Optional: WIT_AI_KEY="your-wit-ai-key" # For additional transcription fallback
 ```
 
 ## 🚨 Important Notes

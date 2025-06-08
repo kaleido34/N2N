@@ -4,14 +4,14 @@ FROM python:3.9-slim
 # Install system dependencies in one layer
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
-    libgomp1 \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
 
 # Copy requirements and install Python dependencies
-COPY requirements-slim.txt requirements.txt
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the application code

@@ -14,14 +14,20 @@ import pytesseract
 from PIL import Image
 import io
 
-# Audio transcription
-import whisper
+# API calls and audio processing
+import requests
+import speech_recognition as sr
+from pydub import AudioSegment
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
-# Load whisper model (small for better balance of accuracy and speed)
-whisper_model = whisper.load_model("small")
+# Initialize speech recognizer
+recognizer = sr.Recognizer()
 
 @app.route('/extract/pdf', methods=['POST'])
 def extract_pdf():
@@ -193,6 +199,9 @@ def extract_image():
 
 @app.route('/extract/audio', methods=['POST'])
 def extract_audio():
+    """
+    Audio transcription using free speech recognition services
+    """
     file = request.files.get('file')
     if not file:
         return jsonify({'error': 'No file uploaded'}), 400
@@ -200,43 +209,90 @@ def extract_audio():
     # Generate a unique audio_id
     audio_id = str(uuid.uuid4())
     
-    # Save to temp file
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as tmp:
-        file.save(tmp.name)
-        
-        # Use whisper for transcription
+    try:
         start_time = time.time()
-        result = whisper_model.transcribe(tmp.name)
+        
+        # Save uploaded file temporarily
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.tmp') as tmp_file:
+            file.save(tmp_file.name)
+            
+            # Convert to WAV format for speech recognition
+            try:
+                audio = AudioSegment.from_file(tmp_file.name)
+                wav_file = tmp_file.name + '.wav'
+                audio.export(wav_file, format='wav')
+            except Exception as e:
+                # If conversion fails, try using the original file
+                wav_file = tmp_file.name
+        
+        # Transcribe using multiple free services (fallback chain)
+        transcript_text = ""
+        service_used = ""
+        
+        with sr.AudioFile(wav_file) as source:
+            audio_data = recognizer.record(source)
+            
+            # Try Google Speech Recognition (free tier - 60 min/month)
+            try:
+                transcript_text = recognizer.recognize_google(audio_data)
+                service_used = "Google Speech Recognition (Free)"
+            except sr.RequestError:
+                # Try Wit.ai if Google fails
+                wit_key = os.getenv('WIT_AI_KEY')
+                if wit_key:
+                    try:
+                        transcript_text = recognizer.recognize_wit(audio_data, key=wit_key)
+                        service_used = "Wit.ai (Free)"
+                    except sr.RequestError:
+                        pass
+            except sr.UnknownValueError:
+                transcript_text = "Could not understand audio"
+                service_used = "Recognition failed"
+        
+        # Clean up temporary files
+        try:
+            os.unlink(tmp_file.name)
+            if wav_file != tmp_file.name:
+                os.unlink(wav_file)
+        except:
+            pass
+        
         processing_time = time.time() - start_time
         
         # Create structured transcript
         transcript = {
-            "text": result["text"],
-            "segments": []
+            "text": transcript_text,
+            "segments": [
+                {
+                    "id": 0,
+                    "start": 0.0,
+                    "end": processing_time,
+                    "text": transcript_text,
+                    "confidence": 0.8
+                }
+            ]
         }
         
-        # Add segments with timestamps
-        for segment in result["segments"]:
-            transcript["segments"].append({
-                "id": segment["id"],
-                "start": segment["start"],
-                "end": segment["end"],
-                "text": segment["text"],
-                "confidence": segment.get("confidence", 1.0)
-            })
-    
-    os.unlink(tmp.name)
-    
-    return jsonify({
-        'audio_id': audio_id,
-        'transcript': transcript,
-        'text': result["text"],
-        'language': result.get("language", "en"),
-        'processing_time': processing_time
-    })
+        return jsonify({
+            'audio_id': audio_id,
+            'transcript': transcript,
+            'text': transcript_text,
+            'language': 'en',
+            'processing_time': processing_time,
+            'service_used': service_used
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'error': f'Transcription failed: {str(e)}',
+            'audio_id': audio_id
+        }), 500
 
 @app.route('/extract/video', methods=['POST'])
 def extract_video():
+    """
+    Video transcription using free speech recognition (extracts audio from video)
+    """
     file = request.files.get('file')
     if not file:
         return jsonify({'error': 'No file uploaded'}), 400
@@ -244,40 +300,90 @@ def extract_video():
     # Generate a unique video_id
     video_id = str(uuid.uuid4())
     
-    # Save to temp file
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp:
-        file.save(tmp.name)
-        
-        # Use whisper for audio transcription from video
+    try:
         start_time = time.time()
-        result = whisper_model.transcribe(tmp.name)
+        
+        # Save uploaded file temporarily
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.tmp') as tmp_file:
+            file.save(tmp_file.name)
+            
+            # Extract audio from video and convert to WAV
+            try:
+                video = AudioSegment.from_file(tmp_file.name)
+                wav_file = tmp_file.name + '.wav'
+                video.export(wav_file, format='wav')
+            except Exception as e:
+                return jsonify({
+                    'error': f'Could not extract audio from video: {str(e)}',
+                    'video_id': video_id
+                }), 500
+        
+        # Transcribe using multiple free services (fallback chain)
+        transcript_text = ""
+        service_used = ""
+        
+        with sr.AudioFile(wav_file) as source:
+            audio_data = recognizer.record(source)
+            
+            # Try Google Speech Recognition (free tier - 60 min/month)
+            try:
+                transcript_text = recognizer.recognize_google(audio_data)
+                service_used = "Google Speech Recognition (Free)"
+            except sr.RequestError:
+                # Try Wit.ai if Google fails
+                wit_key = os.getenv('WIT_AI_KEY')
+                if wit_key:
+                    try:
+                        transcript_text = recognizer.recognize_wit(audio_data, key=wit_key)
+                        service_used = "Wit.ai (Free)"
+                    except sr.RequestError:
+                        pass
+            except sr.UnknownValueError:
+                transcript_text = "Could not understand audio"
+                service_used = "Recognition failed"
+        
+        # Clean up temporary files
+        try:
+            os.unlink(tmp_file.name)
+            os.unlink(wav_file)
+        except:
+            pass
+        
         processing_time = time.time() - start_time
         
         # Create structured transcript
         transcript = {
-            "text": result["text"],
-            "segments": []
+            "text": transcript_text,
+            "segments": [
+                {
+                    "id": 0,
+                    "start": 0.0,
+                    "end": processing_time,
+                    "text": transcript_text,
+                    "confidence": 0.8
+                }
+            ]
         }
         
-        # Add segments with timestamps
-        for segment in result["segments"]:
-            transcript["segments"].append({
-                "id": segment["id"],
-                "start": segment["start"],
-                "end": segment["end"],
-                "text": segment["text"],
-                "confidence": segment.get("confidence", 1.0)
-            })
-    
-    os.unlink(tmp.name)
-    
-    return jsonify({
-        'video_id': video_id,
-        'transcript': transcript,
-        'text': result["text"],
-        'language': result.get("language", "en"),
-        'processing_time': processing_time
-    })
+        return jsonify({
+            'video_id': video_id,
+            'transcript': transcript,
+            'text': transcript_text,
+            'language': 'en',
+            'processing_time': processing_time,
+            'service_used': service_used
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'error': f'Video transcription failed: {str(e)}',
+            'video_id': video_id
+        }), 500
+
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({'status': 'healthy', 'message': 'Extractor server is running'})
 
 if __name__ == '__main__':
-    app.run(port=5005)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)

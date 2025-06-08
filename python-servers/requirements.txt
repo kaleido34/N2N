@@ -1,18 +1,20 @@
+# Core Flask dependencies
 flask
 flask-cors
-transformers
-torch
-numpy
-pandas
-scipy
-matplotlib
-pinecone-client
-openai-whisper
-youtube-transcript-api
-pypdf2
-pytesseract
-opencv-python
+
+# PDF processing
+PyPDF2
+
+# Image processing and OCR
 Pillow
+pytesseract
+
+# Free speech recognition
+SpeechRecognition
+pydub
+
+# API calls for transcription
+requests
+
+# Basic utilities
 python-dotenv
-sentencepiece
-sentence-transformers
