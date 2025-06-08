@@ -27,6 +27,11 @@ import {
   Video,
   Headphones,
   Music,
+  Volume2,
+  Globe,
+  HelpCircle,
+  CreditCard,
+  Map,
 } from "lucide-react";
 import { useAuthStore } from "@/hooks/auth-provider";
 
@@ -261,41 +266,73 @@ export default function Home() {
       {/* How It Works Section */}
       <section id="how-it-works" className="py-20 bg-[#FAF7F8] dark:bg-[#18132A]">
         <h2 className="text-3xl font-bold text-center text-[#232323] dark:text-white mb-6">
-          How Noise2Nectar Works
+          How It Works
         </h2>
         <p className="text-center text-[#5B5B5B] dark:text-gray-200 mb-16 max-w-2xl mx-auto">
-          Transform your study materials in three simple steps
+          AI-powered learning features that make studying more effective and engaging
         </p>
-        <div className="grid md:grid-cols-3 gap-10 max-w-7xl mx-auto">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto px-8">
           {[
             {
-              number: '01',
-              icon: <UploadIcon className="w-10 h-10 text-[#A259A6] dark:text-[#C7AFFF] mb-4" />,
-              title: 'Upload your materials',
-              description: 'Simply upload your notes, textbooks, or any study material you want to learn from.',
+              icon: <FileText className="w-8 h-8" />,
+              title: 'Smart Summaries',
+              description: 'AI-powered summaries that capture key insights and main points',
+              iconBg: 'bg-blue-500 dark:bg-blue-600',
+              iconBgHover: 'group-hover:bg-orange-500 dark:group-hover:bg-orange-500',
             },
             {
-              number: '02',
-              icon: <SlidersHorizontal className="w-10 h-10 text-[#A259A6] dark:text-[#C7AFFF] mb-4" />,
-              title: 'Choose your learning tools',
-              description: 'Select from summaries, flashcards, quizzes, or puzzles based on your learning preferences.',
+              icon: <Volume2 className="w-8 h-8" />,
+              title: 'Audio Narration',
+              description: 'Convert text to natural-sounding audio for on-the-go learning',
+              iconBg: 'bg-purple-500 dark:bg-purple-600',
+              iconBgHover: 'group-hover:bg-orange-500 dark:group-hover:bg-orange-500',
             },
             {
-              number: '03',
-              icon: <BarChart3 className="w-10 h-10 text-[#A259A6] dark:text-[#C7AFFF] mb-4" />,
-              title: 'Study and measure progress',
-              description: 'Use the generated learning materials and track your improvement over time.',
+              icon: <Globe className="w-8 h-8" />,
+              title: 'Multi-Language Translation',
+              description: 'Translate content and learning materials into multiple languages',
+              iconBg: 'bg-green-500 dark:bg-green-600',
+              iconBgHover: 'group-hover:bg-orange-500 dark:group-hover:bg-orange-500',
             },
-          ].map((step, idx) => (
-            <div
-              key={idx}
-              className="rounded-2xl p-8 bg-gradient-to-br from-white to-[#FAF7F8] dark:from-[#23223A] dark:to-[#1E1A2E] shadow flex flex-col items-center text-center h-full border border-[#F0EAFB] dark:border-[#2A2540]"
-              >
-              <span className="text-3xl font-bold text-[#A259A6] dark:text-[#C7AFFF] mb-2">{step.number}</span>
-              {step.icon}
-              <h3 className="text-xl font-semibold text-dark5 dark:text-white mb-2">{step.title}</h3>
-              <p className="text-[#5B5B5B] dark:text-gray-200">{step.description}</p>
-            </div>
+            {
+              icon: <HelpCircle className="w-8 h-8" />,
+              title: 'Interactive Quizzes',
+              description: 'Adaptive quizzes that test comprehension and reinforce learning',
+              iconBg: 'bg-red-500 dark:bg-red-600',
+              iconBgHover: 'group-hover:bg-orange-500 dark:group-hover:bg-orange-500',
+            },
+            {
+              icon: <CreditCard className="w-8 h-8" />,
+              title: 'Smart Flashcards',
+              description: 'Spaced repetition flashcards for effective memorization',
+              iconBg: 'bg-indigo-500 dark:bg-indigo-600',
+              iconBgHover: 'group-hover:bg-orange-500 dark:group-hover:bg-orange-500',
+            },
+            {
+              icon: <Map className="w-8 h-8" />,
+              title: 'Visual Mind Maps',
+              description: 'Interactive mind maps to visualize connections and concepts',
+              iconBg: 'bg-teal-500 dark:bg-teal-600',
+              iconBgHover: 'group-hover:bg-orange-500 dark:group-hover:bg-orange-500',
+            },
+          ].map((feature, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: index * 0.1 }}
+              className="group relative rounded-2xl p-8 bg-gradient-to-br from-white to-[#FAF7F8] dark:from-[#23223A] dark:to-[#1E1A2E] shadow-md hover:shadow-xl border border-[#F0EAFB] dark:border-[#2A2540] transition-all duration-300 cursor-pointer hover:scale-[1.02]"
+            >
+              <div className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl ${feature.iconBg} ${feature.iconBgHover} mb-6 shadow-lg transition-all duration-300`}>
+                <span className="text-white transition-all duration-300">{feature.icon}</span>
+              </div>
+              <h3 className="text-xl font-semibold text-[#232323] dark:text-white mb-3 group-hover:text-orange-500 dark:group-hover:text-orange-400 transition-colors duration-300">
+                {feature.title}
+              </h3>
+              <p className="text-[#5B5B5B] dark:text-gray-200 leading-relaxed">
+                {feature.description}
+              </p>
+            </motion.div>
           ))}
         </div>
       </section>
