@@ -204,69 +204,8 @@ export default function Home() {
 
         {/* Features Section */}
       <section id="features" className="py-20 bg-[#FAF7F8] dark:bg-[#18132A]">
-        <h2 className="text-3xl font-bold text-center text-[#232323] dark:text-white mb-12">
-          Interactive Learning Tools
-          </h2>
-        <p className="text-center text-[#5B5B5B] dark:text-gray-200 mb-16 max-w-2xl mx-auto">
-          Our powerful features make it easy to transform complex information into memorable learning experiences
-        </p>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-10 max-w-7xl mx-auto">
-            {[
-              {
-              icon: <Bot className="w-7 h-7" />,
-              title: "Test Yourself",
-              description: "Challenge your knowledge with adaptive quizzes and assessments that identify your strengths and weaknesses for targeted improvement.",
-              iconBg: "bg-gradient-to-br from-[#F3F0FF] to-[#E8E3FF] dark:from-[#2A2540] dark:to-[#1E1A2E]",
-              },
-              {
-              icon: <BookOpen className="w-7 h-7" />,
-              title: "Create Modules",
-              description: "Build comprehensive learning modules from your content with structured sections, quizzes, and interactive elements.",
-              iconBg: "bg-gradient-to-br from-[#F8F3F4] to-[#F3E8E9] dark:from-[#2A2540] dark:to-[#1E1A2E]",
-              },
-              {
-              icon: <Lightbulb className="w-7 h-7" />,
-              title: "Visual Mind Maps",
-              description: "See the big picture—AI creates interactive mind maps to help you connect concepts and boost understanding.",
-              iconBg: "bg-gradient-to-br from-[#F3F8F4] to-[#E8F3E9] dark:from-[#2A2540] dark:to-[#1E1A2E]",
-              },
-              {
-              icon: <BookMarked className="w-7 h-7" />,
-              title: "Instant Knowledge",
-              description: "Generate smart knowledge cards from any content for rapid, effective revision—no manual work needed.",
-              iconBg: "bg-gradient-to-br from-[#FFF6F3] to-[#FFE8E3] dark:from-[#2A2540] dark:to-[#1E1A2E]",
-              },
-              {
-              icon: <GraduationCap className="w-7 h-7" />,
-              title: "Personalized Learning Paths",
-              description: "Let AI guide your journey—custom study plans adapt to your goals and progress for maximum results.",
-              iconBg: "bg-gradient-to-br from-[#FFF3F8] to-[#FFE8F3] dark:from-[#2A2540] dark:to-[#1E1A2E]",
-              },
-              {
-              icon: <Headphones className="w-7 h-7" />,
-              title: "Listen Audio",
-              description: "Convert your learning materials to audio format for on-the-go studying with natural voice narration and key points highlighted.",
-              iconBg: "bg-gradient-to-br from-[#F3F6FF] to-[#E8EBFF] dark:from-[#2A2540] dark:to-[#1E1A2E]",
-              },
-            ].map((feature, index) => (
-            <div
-                key={index}
-              className="rounded-2xl p-8 bg-gradient-to-br from-white to-[#FAF7F8] dark:from-[#23223A] dark:to-[#1E1A2E] shadow hover:scale-[1.02] transition-transform flex flex-col h-full border border-[#F0EAFB] dark:border-[#2A2540]"
-            >
-              <div className={`flex items-center justify-center w-14 h-14 rounded-xl ${feature.iconBg} mb-6 shadow`}>
-                <span className="text-[#A259A6] dark:text-[#C7AFFF]">{feature.icon}</span>
-              </div>
-              <h3 className="text-xl font-semibold text-dark5 dark:text-white mb-2">{feature.title}</h3>
-              <p className="text-[#5B5B5B] dark:text-gray-200 mb-2">{feature.description}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* How It Works Section */}
-      <section id="how-it-works" className="py-20 bg-[#FAF7F8] dark:bg-[#18132A]">
         <h2 className="text-3xl font-bold text-center text-[#232323] dark:text-white mb-6">
-          How It Works
+          Interactive Learning Tools
         </h2>
         <p className="text-center text-[#5B5B5B] dark:text-gray-200 mb-16 max-w-2xl mx-auto">
           AI-powered learning features that make studying more effective and engaging
@@ -332,6 +271,67 @@ export default function Home() {
               <p className="text-[#5B5B5B] dark:text-gray-200 leading-relaxed">
                 {feature.description}
               </p>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
+      {/* How It Works Section */}
+      <section id="how-it-works" className="py-20 bg-[#FAF7F8] dark:bg-[#18132A]">
+        <h2 className="text-3xl font-bold text-center text-[#232323] dark:text-white mb-6">
+          How Noise2Nectar Works
+        </h2>
+        <p className="text-center text-[#5B5B5B] dark:text-gray-200 mb-16 max-w-2xl mx-auto">
+          Transform your study materials in three simple steps
+        </p>
+        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto px-8">
+          {[
+            {
+              number: '01',
+              icon: <UploadIcon className="w-8 h-8" />,
+              title: 'Upload Your Materials',
+              description: 'Simply upload your notes, textbooks, or any study material you want to learn from',
+              iconBg: 'bg-blue-500 dark:bg-blue-600',
+              iconBgHover: 'group-hover:bg-orange-500 dark:group-hover:bg-orange-500',
+            },
+            {
+              number: '02',
+              icon: <SlidersHorizontal className="w-8 h-8" />,
+              title: 'Choose Learning Tools',
+              description: 'Select from summaries, flashcards, quizzes, or puzzles based on your learning preferences',
+              iconBg: 'bg-purple-500 dark:bg-purple-600',
+              iconBgHover: 'group-hover:bg-orange-500 dark:group-hover:bg-orange-500',
+            },
+            {
+              number: '03',
+              icon: <BarChart3 className="w-8 h-8" />,
+              title: 'Study & Track Progress',
+              description: 'Use the generated learning materials and track your improvement over time',
+              iconBg: 'bg-green-500 dark:bg-green-600',
+              iconBgHover: 'group-hover:bg-orange-500 dark:group-hover:bg-orange-500',
+            },
+          ].map((step, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: index * 0.2 }}
+              className="group relative rounded-2xl p-8 bg-gradient-to-br from-white to-[#FAF7F8] dark:from-[#23223A] dark:to-[#1E1A2E] shadow-md hover:shadow-xl border border-[#F0EAFB] dark:border-[#2A2540] transition-all duration-300 cursor-pointer hover:scale-[1.02] text-center"
+            >
+              <div className="flex flex-col items-center">
+                <span className="text-4xl font-bold text-[#A259A6] dark:text-[#C7AFFF] mb-4 group-hover:text-orange-500 dark:group-hover:text-orange-400 transition-colors duration-300">
+                  {step.number}
+                </span>
+                <div className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl ${step.iconBg} ${step.iconBgHover} mb-6 shadow-lg transition-all duration-300`}>
+                  <span className="text-white transition-all duration-300">{step.icon}</span>
+                </div>
+                <h3 className="text-xl font-semibold text-[#232323] dark:text-white mb-3 group-hover:text-orange-500 dark:group-hover:text-orange-400 transition-colors duration-300">
+                  {step.title}
+                </h3>
+                <p className="text-[#5B5B5B] dark:text-gray-200 leading-relaxed">
+                  {step.description}
+                </p>
+              </div>
             </motion.div>
           ))}
         </div>
