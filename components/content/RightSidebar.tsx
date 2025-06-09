@@ -60,7 +60,7 @@ export default function RightSidebar({
   const getInitials = (name: string) => name?.split(" ").map((part: string) => part[0]).join("").toUpperCase();
 
   return (
-    <aside className="flex flex-col h-screen bg-[#FAF7F8] dark:bg-[#11001C] border-l border-sidebar-border w-72 relative">
+    <aside className="flex flex-col h-screen bg-[#FAF7F8] dark:bg-[#11001C] border-l border-sidebar-border w-72 relative pl-3">
       {/* Header */}
       <div className="flex items-center justify-between px-3 pt-5 pb-5 border-b border-sidebar-border bg-[#FAF7F8] dark:bg-[#11001C]">
         <div className="flex items-center gap-2 group">
@@ -70,7 +70,7 @@ export default function RightSidebar({
       </div>
 
       {/* Main Scrollable Area */}
-      <div className="flex-1 overflow-y-auto py-4 flex flex-col gap-3 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent scrollbar-thumb-rounded-md dark:scrollbar-thumb-gray-600">
+      <div className="flex-1 overflow-y-auto py-4 flex flex-col gap-3 px-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent scrollbar-thumb-rounded-md dark:scrollbar-thumb-gray-600">
         {/* Custom scrollbar styles */}
         <style jsx>{`
           .scrollbar-thin::-webkit-scrollbar {
@@ -96,10 +96,10 @@ export default function RightSidebar({
           }
         `}</style>
         
-        <h3 className="text-base font-semibold mb-4 px-4 text-gray-700 dark:text-gray-200">
+        <h3 className="text-base font-semibold mb-4 px-2 text-gray-700 dark:text-gray-200">
           Interact and Learn
         </h3>
-        <div className="space-y-1 px-4">
+        <div className="space-y-1 px-2">
           {/* Take a Quiz */}
           <QuizDialog 
             contentId={contentId}

@@ -14,7 +14,7 @@ export function useGlobalLoading() {
 function GlobalLoadingOverlay({ show }: { show: boolean }) {
   if (!show) return null;
   return (
-    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#FAF7F8]/95 dark:bg-gray-900/95 transition-all duration-200">
+    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white/80 dark:bg-[#18132A]/80 transition-colors duration-300">
       <div className="flex flex-col items-center gap-6">
         <div className="animate-bounce">
           <img src="/logo.png" alt="Noise2Nectar Logo" width={80} height={80} className="rounded-2xl shadow-xl" />
@@ -47,14 +47,14 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
     if (prevPathRef.current !== pathname) {
       prevPathRef.current = pathname;
 
-      // Only show loading for major route changes, not content pages or workspace pages
-      if (pathname !== '/' && !pathname.startsWith('/content/') && !pathname.startsWith('/dashboard/workspaces')) {
+      // Don't show loading overlay for dashboard routes since dashboard layout handles its own loading
+      if (pathname !== '/' && !pathname.startsWith('/dashboard')) {
         setShow(true);
 
-        // Use a very short timeout to reduce loading flashes
+        // Use a reasonable timeout to hide the overlay
         const timer = setTimeout(() => {
           setShow(false);
-        }, 150);
+        }, 300);
 
         return () => clearTimeout(timer);
       }

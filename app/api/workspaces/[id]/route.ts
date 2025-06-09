@@ -48,11 +48,6 @@ export async function GET(
               },
             },
           },
-          orderBy: {
-            content: {
-              created_at: 'desc' // Order by creation time, newest first
-            }
-          }
         },
       },
     });

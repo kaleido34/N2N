@@ -5,7 +5,6 @@ import { useAuth } from "@/hooks/auth-provider";
 import LeftPanel from "./LeftPanel";
 import RightSidebar from "./RightSidebar";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import Image from "next/image";
 import axios from "axios";
 
 interface SummaryResponse {
@@ -419,20 +418,9 @@ export default function ContentPage({ id }: ContentPageProps) {
 
   // Fetch content when component mounts
   useEffect(() => {
-    let mounted = true;
-    
-    if (user?.token && mounted) {
+    if (user?.token) {
       fetchContent();
     }
-    
-    return () => {
-      mounted = false;
-      // Reset loading states when component unmounts to prevent glitches
-      setLoading(false);
-      setSummaryLoading(false);
-      setAudioLoading(false);
-      setTranscriptLoading(false);
-    };
   }, [id, user]);
 
   // Fetch content from API
@@ -741,21 +729,7 @@ export default function ContentPage({ id }: ContentPageProps) {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#FAF7F8] dark:bg-gray-900 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-6">
-          <div className="animate-bounce">
-            <Image src="/logo.png" alt="Noise2Nectar Logo" width={60} height={60} className="rounded-xl shadow-md" />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-lg font-bold text-[#7B5EA7] dark:text-[#C7AFFF] tracking-tight">Loading content...</span>
-          </div>
-          <div className="mt-2">
-            <span className="inline-block h-5 w-5 rounded-full border-3 border-[#7B5EA7] border-t-transparent animate-spin dark:border-[#C7AFFF] dark:border-t-transparent"></span>
-          </div>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner fullScreen={true} />;
   }
 
   if (error) {
@@ -771,9 +745,9 @@ export default function ContentPage({ id }: ContentPageProps) {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row min-h-screen w-full overflow-x-hidden">
+    <div className="flex min-h-screen w-full overflow-x-hidden">
       {/* Left Panel with Summary */}
-      <div className="flex-1 border-r-0 lg:border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
+      <div className="flex-1 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
         <LeftPanel 
           id={content.id}
           title={content.title}
@@ -783,13 +757,14 @@ export default function ContentPage({ id }: ContentPageProps) {
         {/* Debug display - only in development */}
         {process.env.NODE_ENV === 'development' && (
           <div className="p-2 bg-blue-100 text-blue-800 text-xs">
+
             length: {Array.isArray(content.summary) ? content.summary.length : 0}
           </div>
         )}
       </div>
       
       {/* Right Sidebar */}
-      <div className="border-t lg:border-t-0 lg:border-l border-gray-200 dark:border-gray-700 h-auto lg:h-full w-full lg:w-72">
+      <div className="border-l border-gray-200 dark:border-gray-700 h-full">
         <RightSidebar 
           contentId={content.id}
           youtubeId={content.youtube_id}

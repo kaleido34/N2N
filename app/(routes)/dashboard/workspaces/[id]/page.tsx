@@ -16,7 +16,7 @@ import {
 import { MoreVertical, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-
+import { useGlobalLoading } from "@/components/LayoutClient";
 import React from "react";
 import { toast } from "sonner";
 import { BackButton } from "@/components/ui/back-button";
@@ -48,13 +48,11 @@ export default function SpacePage() {
   const router = useRouter();
   const { spaces, loading, refreshSpaces } = useSpaces();
   const { isAuthenticated, user } = useAuth();
-
+  const { setShow } = useGlobalLoading();
   const { copyLesson } = useClipboard();
 
   const [localContents, setLocalContents] = React.useState<ContentItem[]>([]);
-  const [visibleLessons, setVisibleLessons] = React.useState<ContentItem[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
-  const [progressiveLoading, setProgressiveLoading] = React.useState(false);
   const spaceId = params.id as string;
 
   // Use a ref to track if a fetch is in progress
@@ -74,7 +72,6 @@ export default function SpacePage() {
     
     isFetchingRef.current = true;
     setIsLoading(true);
-    setVisibleLessons([]); // Reset visible lessons
     
     try {
       // Add cache busting to prevent stale data
@@ -111,69 +108,30 @@ export default function SpacePage() {
         // Always ensure contents is a valid array
         const safeContents = Array.isArray(space.contents) ? space.contents : [];
         
-        // Sort contents in reverse chronological order (newest first)
-        const sortedContents = safeContents.sort((a: ContentItem, b: ContentItem) => {
-          const dateA = new Date(a.createdAt || 0).getTime();
-          const dateB = new Date(b.createdAt || 0).getTime();
-          return dateB - dateA; // Descending order (newest first)
-        });
-        
         // Important: Log content items for debugging
-        if (sortedContents.length > 0) {
-          console.log("[DEBUG] Content items found:", sortedContents.map((c: ContentItem) => ({ id: c.id, type: c.type, title: c.title })));
+        if (safeContents.length > 0) {
+          console.log("[DEBUG] Content items found:", safeContents.map((c: ContentItem) => ({ id: c.id, type: c.type, title: c.title })));
         } else {
           console.log("[DEBUG] No content items found in the workspace");
         }
         
-        setLocalContents(sortedContents);
-        
-        // Start progressive loading if there are lessons
-        if (sortedContents.length > 0) {
-          setProgressiveLoading(true);
-          startProgressiveLoading(sortedContents);
-        } else {
-          setVisibleLessons([]);
-        }
-        
+        setLocalContents(safeContents);
         // Mark as fetched
         hasFetchedRef.current = true;
       } else {
         console.warn("[DEBUG] No workspace data found in API response");
         setLocalContents([]);
-        setVisibleLessons([]);
       }
     } catch (error) {
       console.error("[ERROR] Error fetching workspace contents:", error);
       toast.error("Failed to load workspace contents");
       setLocalContents([]);
-      setVisibleLessons([]);
     } finally {
       setIsLoading(false);
+      setShow(false);
       isFetchingRef.current = false;
     }
-  }, [spaceId, user?.token]);
-
-  // Progressive loading function to show lessons one by one
-  const startProgressiveLoading = React.useCallback((contents: ContentItem[]) => {
-    setVisibleLessons([]); // Reset visible lessons
-    
-    contents.forEach((lesson, index) => {
-      setTimeout(() => {
-        setVisibleLessons(prev => {
-          // Check if lesson is already visible to avoid duplicates
-          if (prev.find(l => l.id === lesson.id)) {
-            return prev;
-          }
-          return [...prev, lesson];
-        });
-        
-        // Mark progressive loading as complete after last lesson
-        if (index === contents.length - 1) {
-          setTimeout(() => setProgressiveLoading(false), 100);
-        }
-      }, index * 150); // 150ms delay between each lesson
-    });
-  }, []);
+  }, [spaceId, user?.token, setShow]);
   
   // Check for refresh parameters and stored tokens
   React.useEffect(() => {
@@ -210,7 +168,8 @@ export default function SpacePage() {
       // Always reset fetch state for consistent behavior
       hasFetchedRef.current = false;
       
-
+      // Show loading indicator
+      setShow(true);
       
       // Check if this is a forced refresh from URL parameter
       const url = typeof window !== 'undefined' ? window.location.href : '';
@@ -241,37 +200,17 @@ export default function SpacePage() {
     // Cleanup function
     return () => {
       mounted = false;
+      setShow(false);
     };
-  }, [isAuthenticated, loading, spaceId, fetchWorkspaceContents]);
+  }, [isAuthenticated, loading, spaceId, fetchWorkspaceContents, setShow]);
 
-  // Show loading state if not authenticated or still loading spaces
-  if (!isAuthenticated || loading) {
-    return (
-      <div className="min-h-screen bg-[#FAF7F8] dark:bg-gray-900 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-6">
-          <div className="animate-bounce">
-            <Image src="/logo.png" alt="Noise2Nectar Logo" width={60} height={60} className="rounded-xl shadow-md" />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-lg font-bold text-[#7B5EA7] dark:text-[#C7AFFF] tracking-tight">Loading...</span>
-          </div>
-          <div className="mt-2">
-            <span className="inline-block h-5 w-5 rounded-full border-3 border-[#7B5EA7] border-t-transparent animate-spin dark:border-[#C7AFFF] dark:border-t-transparent"></span>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Authentication and loading is handled by the dashboard layout, so we don't need redundant checks
 
   // Find the specific workspace by ID from the global store
   const workspaceData = spaces.find((space) => space.id === spaceId) || null;
 
   if (!workspaceData) {
-    return (
-      <div className="min-h-screen bg-[#FAF7F8] dark:bg-gray-900 flex items-center justify-center">
-        <p className="text-gray-600 dark:text-gray-300">Workspace not found</p>
-      </div>
-    );
+    return <p>Workspace not found</p>;
   }
 
   // Keep this for any future UI differences, but delete will work everywhere
@@ -307,7 +246,6 @@ export default function SpacePage() {
       
       // Update local state immediately for better UX
       setLocalContents((prev) => prev.filter((item) => item.id !== contentId));
-      setVisibleLessons((prev) => prev.filter((item) => item.id !== contentId));
       
       // Refresh spaces to update the sidebar
       if (user?.token && refreshSpaces) {
@@ -371,70 +309,21 @@ export default function SpacePage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF7F8] dark:bg-gray-900">
-      <main className="container mx-auto py-4 sm:py-6 md:py-8 px-4 sm:px-6 md:px-8 max-w-7xl">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center w-full mb-6 sm:mb-8 gap-4">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-[#5B4B8A] dark:text-white">
+    <div className="min-h-full bg-[#FAF7F8] dark:bg-gray-900">
+      <main className="container py-8 px-4 md:px-8">
+        <div className="flex justify-between items-start w-full mb-8">
+          <h1 className="text-4xl font-bold tracking-tight pt-4 text-[#5B4B8A] dark:text-white">
             {isPersonalWorkspace ? "Personal Workspace" : workspaceData.name}
           </h1>
           <BackButton onClick={() => router.push("/dashboard/workspaces")} />
         </div>
-
-        {/* Show initial loading state */}
-        {isLoading && (
-          <div className="flex flex-col items-center justify-center py-20">
-            <div className="flex flex-col items-center gap-6">
-              <div className="animate-bounce">
-                <Image src="/logo.png" alt="Noise2Nectar Logo" width={60} height={60} className="rounded-xl shadow-md" />
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-lg font-bold text-[#7B5EA7] dark:text-[#C7AFFF] tracking-tight">Loading workspace...</span>
-              </div>
-              <div className="mt-2">
-                <span className="inline-block h-5 w-5 rounded-full border-3 border-[#7B5EA7] border-t-transparent animate-spin dark:border-[#C7AFFF] dark:border-t-transparent"></span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Show empty state */}
-        {!isLoading && visibleLessons.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="text-gray-400 dark:text-gray-500 mb-4">
-              <FileText className="h-16 w-16 mx-auto mb-2" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">No lessons yet</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Add your first lesson to get started
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Show progressive loading indicator */}
-        {progressiveLoading && localContents.length > visibleLessons.length && (
-          <div className="flex items-center justify-center py-4 mb-4">
-            <div className="flex items-center gap-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-2 border-[#7B5EA7] border-t-transparent dark:border-[#C7AFFF] dark:border-t-transparent"></div>
-            </div>
-          </div>
-        )}
-
-        {/* Show lessons grid when not initially loading */}
-        {!isLoading && visibleLessons.length > 0 && (
-          <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-            {visibleLessons.map((item, index) => (
-              <div 
-                key={item.id} 
-                className="relative group opacity-0 fade-in-up"
-                style={{ 
-                  animationDelay: `${index * 150}ms`,
-                  animationFillMode: 'forwards'
-                }}
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {localContents.map((item) => (
+            <div key={item.id} className="relative group">
+              <Link
+                href={`/content/${item.id}`}
+                className="group relative rounded-md border overflow-hidden hover:border-primary transition-colors block p-2 bg-card dark:bg-gray-800"
               >
-                              <Link
-                  href={`/content/${item.id}`}
-                  className="group relative rounded-lg border overflow-hidden hover:border-primary transition-all duration-200 block p-3 sm:p-4 bg-card dark:bg-gray-800 hover:shadow-lg hover:scale-[1.02] transform"
-                >
                 {item.type === "YOUTUBE_CONTENT" ? (
                   <div className="aspect-video bg-muted relative rounded-md overflow-hidden">
                     <Image
@@ -537,11 +426,10 @@ export default function SpacePage() {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-                </div>
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          ))}
+        </div>
       </main>
     </div>
   );
