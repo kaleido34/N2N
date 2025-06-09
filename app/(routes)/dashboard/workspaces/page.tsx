@@ -8,6 +8,7 @@ import { useClipboard } from "@/hooks/clipboard-provider";
 import { CreateSpaceDialog } from "@/components/create-space-dialog";
 import { Briefcase, MoreVertical, PlusCircle, Trash2, Clipboard } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { BackButton } from "@/components/ui/back-button";
 import {
@@ -91,10 +92,17 @@ export default function SpacesPage() {
   // Show stable loading state until everything is ready
   if (isStableLoading || (!hasInitialized && isAuthenticated)) {
     return (
-      <div className="min-h-full flex flex-col items-center justify-center dark:bg-gray-900 py-20">
-        <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#5B4B8A]"></div>
-          <p className="text-sm text-gray-600 dark:text-gray-400">Loading workspaces...</p>
+      <div className="min-h-screen bg-[#FAF7F8] dark:bg-gray-900 flex flex-col items-center justify-center py-20">
+        <div className="flex flex-col items-center gap-6">
+          <div className="animate-bounce">
+            <Image src="/logo.png" alt="Noise2Nectar Logo" width={60} height={60} className="rounded-xl shadow-md" />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-bold text-[#7B5EA7] dark:text-[#C7AFFF] tracking-tight">Loading workspaces...</span>
+          </div>
+          <div className="mt-2">
+            <span className="inline-block h-5 w-5 rounded-full border-3 border-[#7B5EA7] border-t-transparent animate-spin dark:border-[#C7AFFF] dark:border-t-transparent"></span>
+          </div>
         </div>
       </div>
     );
@@ -108,7 +116,7 @@ export default function SpacesPage() {
   // Show empty state if there are no spaces
   if (!spaces || spaces.length === 0) {
     return (
-      <div className="min-h-full dark:bg-gray-900">
+      <div className="min-h-screen bg-[#FAF7F8] dark:bg-gray-900">
         <main className="container py-6 px-4 md:px-8">
           <div className="flex justify-between items-start w-full mb-8">
             <h2 className="text-4xl font-bold tracking-tight pt-4" style={{color: '#5B4B8A'}}>
@@ -274,15 +282,15 @@ export default function SpacesPage() {
   };
 
   return (
-    <div className="min-h-full bg-[#FAF7F8] dark:bg-gray-900">
-      <main className="container py-8 px-4 md:px-8">
-        <div className="flex justify-between items-start w-full mb-8">
-          <h2 className="text-4xl font-bold tracking-tight pt-4 text-[#5B4B8A] dark:text-white">
+    <div className="min-h-screen bg-[#FAF7F8] dark:bg-gray-900">
+      <main className="container mx-auto py-4 sm:py-6 md:py-8 px-4 sm:px-6 md:px-8 max-w-7xl">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center w-full mb-6 sm:mb-8 gap-4">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-[#5B4B8A] dark:text-white">
             My Workspaces
           </h2>
           <BackButton onClick={() => router.push("/dashboard")} />
         </div>
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {spaces.map((space) => (
             <div key={space.id} className="group relative bg-card dark:bg-gray-800 rounded-xl border border-border p-6 hover:shadow-lg transition-all duration-200 hover:-translate-y-1 h-full flex flex-col">
             <div className="flex justify-between items-start mb-2">

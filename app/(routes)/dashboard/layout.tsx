@@ -191,8 +191,10 @@ export default function DashboardLayout({
   return (
     <div className="flex min-h-screen w-full overflow-x-hidden">
       <DashboardSidebar minimized={minimized} setMinimized={setMinimized} />
-      <main className="flex-1">
+      <main className="flex-1 overflow-x-hidden">
+        <div className="w-full max-w-full">
         {children}
+        </div>
       </main>
     </div>
   );

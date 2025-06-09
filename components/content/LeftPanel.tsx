@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import Image from "next/image";
 
 interface LeftPanelProps {
   id: string;
@@ -157,8 +158,17 @@ export default function LeftPanel({
           <div className="prose dark:prose-invert max-w-none px-2">
             {loading ? (
               <div className="flex flex-col items-center justify-center py-6">
-                <LoadingSpinner fullScreen={false} />
-                <p className="text-gray-500 mt-3">Loading summary...</p>
+                <div className="flex flex-col items-center gap-4">
+                  <div className="animate-bounce">
+                    <Image src="/logo.png" alt="Noise2Nectar Logo" width={40} height={40} className="rounded-lg shadow-md" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-[#7B5EA7] dark:text-[#C7AFFF]">Loading summary...</span>
+                  </div>
+                  <div className="mt-1">
+                    <span className="inline-block h-4 w-4 rounded-full border-2 border-[#7B5EA7] border-t-transparent animate-spin dark:border-[#C7AFFF] dark:border-t-transparent"></span>
+                  </div>
+                </div>
               </div>
             ) : summary && summary.length > 0 ? (
               <div className="space-y-1">
