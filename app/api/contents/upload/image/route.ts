@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { v4 as uuid } from "uuid";
 import { generateQuiz, generateFlashCards, generateMindMap, summarizeChunks, transcriptInterface } from "@/lib/utils";
+import { cleanAiJsonResponse, safeJsonParseFromAiResponse } from "@/lib/ai-utils";
 
 export const config = {
   api: {
@@ -12,12 +13,13 @@ export const config = {
 async function extractTextFromImageWithPython(file: Blob): Promise<{ image_id: string, text: string, transcript: any }> {
   const formData = new FormData();
   formData.append("file", file);
-  // Call the Python extractor server
-          const res = await fetch(`${process.env.PYTHON_SERVER_URL}/extract/image`, {
-    method: "POST",
-    body: formData,
-  });
-  if (!res.ok) throw new Error("Failed to extract image text via Python server");
+      // Call the local extractor API
+    const baseUrl = process.env.NEXTAUTH_URL || `http://localhost:${process.env.PORT || 3000}`;
+    const res = await fetch(`${baseUrl}/api/extract/image`, {
+      method: "POST",
+      body: formData,
+    });
+  if (!res.ok) throw new Error("Failed to extract image text via local API");
   const data = await res.json();
   
   // Ensure transcript is always in JSON format
@@ -139,19 +141,22 @@ export async function POST(req: NextRequest) {
       generateFlashCards(transcriptText),
       generateMindMap(transcriptText),
       summarizeChunks(transcriptText).then(summary => {
-        // Ensure the summary is properly stringified before saving
-        if (summary) {
+        if (!summary) return null;
+        try {
+          const parsed = typeof summary === 'string'
+            ? safeJsonParseFromAiResponse(summary)
+            : summary;
+          return JSON.stringify(parsed);
+        } catch (e) {
+          console.error('Error processing summary:', e);
           try {
-            // If it's already a string, parse it to ensure it's valid JSON
-            const parsed = typeof summary === 'string' ? JSON.parse(summary) : summary;
-            // Then re-stringify it to ensure consistent format
+            const cleaned = typeof summary === 'string' ? cleanAiJsonResponse(summary) : JSON.stringify(summary);
+            const parsed = JSON.parse(cleaned);
             return JSON.stringify(parsed);
-          } catch (e) {
-            console.error('Error processing summary:', e);
+          } catch {
             return null;
           }
         }
-        return null;
       }),
     ]);
     

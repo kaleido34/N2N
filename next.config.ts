@@ -21,7 +21,7 @@ const nextConfig: NextConfig = {
   },
   
   // Update the experimental options
-  serverExternalPackages: ['sharp', 'onnxruntime-node'],
+  serverExternalPackages: ['sharp', 'onnxruntime-node', 'tesseract.js'],
   webpack: (config, { isServer }) => {
     // Add rule for .node files
     config.module.rules.push({

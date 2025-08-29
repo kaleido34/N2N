@@ -20,7 +20,7 @@
 
 *   **Frontend:** Next.js, React, TypeScript, Tailwind CSS
 *   **Backend (Node.js):** Next.js API Routes, Prisma (ORM)
-*   **Backend (Python):** Separate Python server (e.g., Flask/FastAPI - `extractor_server.py`) for specialized processing tasks.
+*   **Content Processing:** Built-in JavaScript APIs for PDF, image OCR, and audio transcription.
 *   **Database:** PostgreSQL
 *   **Authentication & BaaS:** Supabase
 *   **AI & Machine Learning:**
@@ -29,15 +29,14 @@
 *   **UI Components:** Radix UI, Lucide Icons, Sonner (notifications)
 *   **Form Management:** React Hook Form, Zod (validation)
 *   **State Management:** Zustand
-*   **Other Key Libraries:** Axios, pdf-parse, youtube-transcript, markdown-it
+*   **Other Key Libraries:** Axios, pdf-parse, tesseract.js, openai, youtube-transcript, markdown-it
 
 ##  Prerequisites
 
 *   Node.js (v18 or later recommended)
 *   npm, yarn, or pnpm
-*   Python (v3.8 or later recommended)
 *   PostgreSQL server
-*   Access to services like Supabase, Google AI, Pinecone (and their respective API keys).
+*   Access to services like Supabase, Google AI, OpenAI (for audio transcription), Pinecone (and their respective API keys).
 
 
 1234

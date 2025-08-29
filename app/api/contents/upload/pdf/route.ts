@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { v4 as uuid } from "uuid";
 import { generateQuiz, generateFlashCards, generateMindMap, summarizeChunks, transcriptInterface } from "@/lib/utils";
+import { cleanAiJsonResponse } from "@/lib/ai-utils";
 
 export const config = {
   api: {
@@ -12,12 +13,12 @@ export const config = {
 async function extractTextFromPDFWithPython(file: Blob): Promise<string> {
   const formData = new FormData();
   formData.append("file", file);
-  // Call the Python extractor server
-  const res = await fetch(`${process.env.PYTHON_SERVER_URL}/extract/pdf`, {
+  // Call the local extractor API
+      const res = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3001'}/api/extract/pdf`, {
     method: "POST",
     body: formData,
   });
-  if (!res.ok) throw new Error("Failed to extract PDF text via Python server");
+  if (!res.ok) throw new Error("Failed to extract PDF text via local API");
   const data = await res.json();
   return data.text || "";
 }
@@ -61,16 +62,19 @@ export async function POST(req: NextRequest) {
     finalSpaceId = personalWorkspace.space_id;
   }
 
-  // Extract text from PDF using Python server
+  // Extract text from PDF using local API
   let pdfData;
   try {
     const formData = new FormData();
     formData.append("file", file);
-    const res = await fetch(`${process.env.PYTHON_SERVER_URL}/extract/pdf`, {
+    
+    // Use dynamic port detection for local development
+    const baseUrl = process.env.NEXTAUTH_URL || `http://localhost:${process.env.PORT || 3000}`;
+    const res = await fetch(`${baseUrl}/api/extract/pdf`, {
       method: "POST",
       body: formData,
     });
-    if (!res.ok) throw new Error("Failed to extract PDF text via Python server");
+    if (!res.ok) throw new Error("Failed to extract PDF text via local API");
     pdfData = await res.json();
   } catch (err) {
     return new Response("Failed to extract PDF text", { status: 500 });
@@ -127,8 +131,10 @@ export async function POST(req: NextRequest) {
           // Ensure the summary is properly stringified before saving
           if (summaryData) {
             try {
-              // If it's already a string, parse it to ensure it's valid JSON
-              const parsed = typeof summaryData === 'string' ? JSON.parse(summaryData) : summaryData;
+              // Clean the AI response to remove markdown formatting
+              const cleanedSummary = cleanAiJsonResponse(summaryData);
+              // Parse to validate it's proper JSON
+              const parsed = JSON.parse(cleanedSummary);
               // Then re-stringify it to ensure consistent format
               return JSON.stringify(parsed);
             } catch (e) {

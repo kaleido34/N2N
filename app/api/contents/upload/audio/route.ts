@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { v4 as uuid } from "uuid";
 import { generateQuiz, generateFlashCards, generateMindMap, summarizeChunks, transcriptInterface } from "@/lib/utils";
+import { cleanAiJsonResponse } from "@/lib/ai-utils";
 import { parseAiResponse } from "@/lib/ai-utils";
 
 export const config = {
@@ -13,12 +14,13 @@ export const config = {
 async function extractTextFromAudioWithPython(file: Blob): Promise<{ audio_id: string, text: string, transcript: any }> {
   const formData = new FormData();
   formData.append("file", file);
-  // Call the Python extractor server
-          const res = await fetch(`${process.env.PYTHON_SERVER_URL}/extract/audio`, {
-    method: "POST",
-    body: formData,
-  });
-  if (!res.ok) throw new Error("Failed to extract audio text via Python server");
+      // Call the local extractor API
+    const baseUrl = process.env.NEXTAUTH_URL || `http://localhost:${process.env.PORT || 3000}`;
+    const res = await fetch(`${baseUrl}/api/extract/audio`, {
+      method: "POST",
+      body: formData,
+    });
+  if (!res.ok) throw new Error("Failed to extract audio text via local API");
   const data = await res.json();
   
   // Ensure transcript is always in JSON format
