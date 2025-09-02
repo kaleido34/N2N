@@ -13,7 +13,8 @@ export const signupValidation = (data: object) => {
 
 export const signinValidation = (data: object) => {
     const schema = z.object({
-        username: z.string().min(3).max(30),
+        // Align with signup: username is an email
+        username: z.string().email(),
         password: z.string().min(8).max(30),
     })
 
